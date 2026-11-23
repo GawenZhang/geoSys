@@ -136,9 +136,16 @@
                                 <label>手机号</label>
                                 <input type="text" name="mobile" class="form-control" placeholder="请输入实名手机号码" value="1*********2">
                             </div>
-            
-                        
-                          
+                            <div class="form-group">
+                                <label>身份证正面</label>
+                                <input type="hidden" id="c-idcard_front" name="row[idcard_front]" value="">
+                                <input type="file" accept="image/*" data-input-id="c-idcard_front" data-category="realname">
+                            </div>
+                            <div class="form-group">
+                                <label>身份证反面</label>
+                                <input type="hidden" id="c-idcard_back" name="row[idcard_back]" value="">
+                                <input type="file" accept="image/*" data-input-id="c-idcard_back" data-category="realname">
+                            </div>
                         </form>
                     </div>
                                     </div>
@@ -180,8 +187,12 @@
                                 <label>手机号</label>
                                 <input type="text" name="mobile" class="form-control" placeholder="请输入实名手机号码" value="1*********2">
                             </div>
-          
-                                                    </form>
+                            <div class="form-group">
+                                <label>营业执照</label>
+                                <input type="hidden" id="c-license" name="row[license]" value="">
+                                <input type="file" accept="image/*,.pdf" data-input-id="c-license" data-category="realname">
+                            </div>
+                        </form>
                     </div>
                                     </div>
             </div>

@@ -13,6 +13,21 @@ capture/
 node_modules/
 *.log
 
+# Django / Python
+backend/.env
+backend/db.sqlite3
+backend/staticfiles/
+backend/media/
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Local session cookies / tooling
+cookies.txt
+cookies*.txt
+.codex/
+
 # OS noise
 Thumbs.db
 .DS_Store

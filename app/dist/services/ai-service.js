@@ -125,11 +125,14 @@
         // Keep the complete fetch/body parsing chain under the same timeout and cancellation.
         Promise.resolve().then(function () {
           if (settled) return null;
+          var csrfMatch = (root.document && root.document.cookie || '').match(/(?:^|; )csrftoken=([^;]*)/);
+          var headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
+          if (csrfMatch) headers['X-CSRFToken'] = decodeURIComponent(csrfMatch[1]);
           return root.fetch(url.href, {
             method: 'POST',
             credentials: 'same-origin',
             redirect: 'error',
-            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            headers: headers,
             body: body,
             signal: controller.signal
           });
@@ -149,7 +152,8 @@
             if (!payload || typeof payload !== 'object' || Array.isArray(payload) || typeof payload.ok !== 'boolean') {
               finish('error', 'invalid_response');
             } else if (!payload.ok) {
-              finish('error', 'service_error');
+              var failureCode = payload.error && messages[payload.error.code] ? payload.error.code : 'service_error';
+              finish(failureCode === 'not_configured' ? 'not_configured' : 'error', failureCode);
             } else if (!Object.prototype.hasOwnProperty.call(payload, 'data') || payload.data === null || payload.data === undefined) {
               finish('error', 'invalid_response');
             } else {

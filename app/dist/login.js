@@ -1,9 +1,10 @@
-﻿/* Independent local demonstration. No remote authentication is performed. */
+﻿/* Django session login for the local geoSys frontend. */
 (function () {
   'use strict';
   var form = document.getElementById('login-form');
   var fallback = document.getElementById('login-feedback');
   var messageTimer;
+  var submitting = false;
 
   function showMessage(message) {
     var layer = window.layer || (window.layui && window.layui.layer);
@@ -17,34 +18,56 @@
     messageTimer = setTimeout(function () { fallback.hidden = true; }, 2000);
   }
 
-  function submitDemo(event) {
+  function ensureCsrf() {
+    if (!window.GeoAPI) return Promise.resolve();
+    if (window.GeoAPI.csrfToken()) return Promise.resolve();
+    return window.GeoAPI.request('/api/auth/csrf');
+  }
+
+  function submitLogin(event) {
     event.preventDefault();
+    if (submitting) return;
     if (!document.getElementById('agree_input').checked) {
       showMessage('请阅读并勾选用户协议');
       return;
     }
-    if (document.getElementById('username').value !== 'demo' || document.getElementById('password').value !== 'demo123') {
-      showMessage('演示账号或密码错误');
+    if (!window.GeoAPI) {
+      showMessage('登录接口未加载，请通过 Django 服务访问页面');
       return;
     }
-    try {
-      sessionStorage.setItem('geo-demo-session', 'active');
-      if (document.getElementById('keeplogin').checked) {
-        localStorage.setItem('geo-demo-remember', 'active');
-      } else {
-        localStorage.removeItem('geo-demo-remember');
+
+    var username = document.getElementById('username').value.trim();
+    var password = document.getElementById('password').value;
+    var keeplogin = !!(document.getElementById('keeplogin') && document.getElementById('keeplogin').checked);
+    if (!username || !password) {
+      showMessage('请输入账号和密码');
+      return;
+    }
+
+    submitting = true;
+    ensureCsrf().then(function () {
+      return window.GeoAPI.login({ username: username, password: password, keeplogin: keeplogin });
+    }).then(function (result) {
+      if (!result.ok) {
+        showMessage((result.error && result.error.message) || '登录失败');
+        return;
       }
-    } catch (error) {
-      showMessage('无法保存演示登录状态，请允许浏览器本地存储');
-      return;
-    }
-    window.location.assign('/user/index/index');
+      try {
+        sessionStorage.setItem('geo-demo-session', 'active');
+        if (keeplogin) localStorage.setItem('geo-demo-remember', 'active');
+        else localStorage.removeItem('geo-demo-remember');
+      } catch (error) { /* session cookie is authoritative */ }
+      window.location.assign('/user/index/index');
+    }).catch(function () {
+      showMessage('无法连接登录服务，请确认后端已启动');
+    }).finally(function () {
+      submitting = false;
+    });
   }
 
   if (window.jQuery) {
-    window.jQuery(form).on('submit', submitDemo);
+    window.jQuery(form).on('submit', submitLogin);
   } else {
-    form.addEventListener('submit', submitDemo);
+    form.addEventListener('submit', submitLogin);
   }
 }());
-

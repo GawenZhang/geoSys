@@ -48,9 +48,203 @@
     function family(url){return normalize(url).replace(/\/(media_id|id|ids)\/\d+/g,'/$1/{record}');}
     var path=family(actionURL(control));return Object.keys(layouts).find(function(selector){return layouts[selector].url&&family(layouts[selector].url)===path;});
   }
+  function apiResource() {
+    return window.GeoAPI ? window.GeoAPI.resourceFor(pageKey) : null;
+  }
+  function apiResourceBase() {
+    var resource = apiResource();
+    return resource ? resource.split('?')[0] : null;
+  }
+  var listQuery = {};
+  function apiListUrl() {
+    var resource = apiResource();
+    if (!resource) return null;
+    var params = Object.assign({ page: 1, page_size: 100 }, listQuery || {});
+    var query = Object.keys(params).filter(function (key) {
+      return params[key] != null && String(params[key]).trim() !== '';
+    }).map(function (key) {
+      return encodeURIComponent(key) + '=' + encodeURIComponent(params[key]);
+    }).join('&');
+    return resource + (resource.indexOf('?') === -1 ? '?' : '&') + query;
+  }
+  function editRecordId() {
+    var params = new URLSearchParams(location.search);
+    if (params.get('editId')) return params.get('editId');
+    var pathMatch = location.pathname.match(/\/(?:ids|id)\/(\d+)/);
+    if (pathMatch) return pathMatch[1];
+    var keyMatch = pageKey.match(/-edit-ids?-(\d+)/);
+    if (keyMatch) return keyMatch[1];
+    var form = one('form');
+    return (form && form.dataset.id) || body.dataset.id || '';
+  }
+  function apiSubtype() {
+    var meta = window.GeoAPI && window.GeoAPI.resourceMeta(pageKey);
+    return (meta && meta.subtype) || '';
+  }
+  function ensureAuth() {
+    if (!window.GeoAPI || new URLSearchParams(location.search).has('localDialog')) return Promise.resolve(true);
+    return window.GeoAPI.me().then(function (result) {
+      if (result.ok) return true;
+      location.href = '/user/index/login/';
+      return false;
+    }).catch(function () {
+      location.href = '/user/index/login/';
+      return false;
+    });
+  }
+  function buildApiBody(values) {
+    var raw = window.GeoAPI ? window.GeoAPI.unwrapRow(values) : values;
+    var body = Object.assign({}, raw);
+    if (body.type_name && !body.name) body.name = body.type_name;
+    if (body.company_keyword_id) body.company_keyword_id = Number(body.company_keyword_id) || body.company_keyword_id;
+    if (body.type_id) body.type_id = Number(body.type_id) || body.type_id;
+    if (body.image_type_id) body.image_type_id = Number(body.image_type_id) || body.image_type_id;
+    if (body.tuozhan_status != null) body.tuozhan_status = Number(body.tuozhan_status);
+    if (body.status != null && body.status !== '') body.status = Number(body.status);
+    if (body.content == null) {
+      var editor = one('textarea[name="row[content]"],#c-content,.edui-default textarea');
+      if (editor) body.content = editor.value;
+    }
+    var subtype = apiSubtype();
+    if (subtype) body.subtype = subtype;
+    return body;
+  }
+  function nestedValue(item, field) {
+    if (!field) return '';
+    if (Object.prototype.hasOwnProperty.call(item, field) && item[field] != null) return item[field];
+    if (item.data && Object.prototype.hasOwnProperty.call(item.data, field) && item.data[field] != null) return item.data[field];
+    if (field.indexOf('.') !== -1) {
+      var parts = field.split('.');
+      var cursor = item;
+      for (var i = 0; i < parts.length; i++) {
+        if (cursor == null) return '';
+        cursor = cursor[parts[i]] != null ? cursor[parts[i]] : (cursor.data && cursor.data[parts[i]]);
+      }
+      return cursor == null ? '' : cursor;
+    }
+    if (field === 'addtime') return (item.addtime || item.created_at || '').toString().replace('T', ' ').slice(0, 19);
+    if (field === 'created_at') return (item.created_at || '').toString().replace('T', ' ').slice(0, 19);
+    return '';
+  }
+  function operateCell(item) {
+    var basePath = (body.dataset.pagePath || ('/user/' + pageKey.split('-')[0])).replace(/\/$/, '');
+    return '<td><a href="javascript:;" class="btn btn-xs btn-success btn-editone" data-url="'+escapeHTML(basePath)+'/edit/ids/'+item.id+'" data-id="'+item.id+'">编辑</a> <a href="javascript:;" class="btn btn-xs btn-danger btn-delone" data-id="'+item.id+'">删除</a></td>';
+  }
+  function rowCellsFor(item) {
+    var statusLabel = ({0:'待审核',1:'正常',2:'禁用'})[item.status] || String(item.status == null ? '' : item.status);
+    if (pageKey === 'company_keyword') {
+      return [
+        '<td class="bs-checkbox"><input name="btSelectItem" type="checkbox" data-id="'+item.id+'"></td>',
+        '<td>'+item.id+'</td>',
+        '<td>'+escapeHTML(item.keyword)+'</td>',
+        '<td>'+escapeHTML(String((item.zhengliu_question||'').split(/\r?\n/).filter(Boolean).length))+'</td>',
+        '<td>'+(item.tuozhan_status ? '自动拓词' : '不拓词')+'</td>',
+        '<td>'+escapeHTML((item.created_at||'').replace('T',' ').slice(0,19))+'</td>',
+        operateCell(item)
+      ].join('');
+    }
+    if (pageKey === 'company_question') {
+      return [
+        '<td class="bs-checkbox"><input name="btSelectItem" type="checkbox" data-id="'+item.id+'"></td>',
+        '<td>'+item.id+'</td>',
+        '<td>'+escapeHTML(item.company_keyword||'')+'</td>',
+        '<td style="text-align:left">'+escapeHTML((item.question||'').split(/\r?\n/)[0]||'')+'</td>',
+        '<td>'+escapeHTML((item.created_at||'').replace('T',' ').slice(0,19))+'</td>',
+        operateCell(item)
+      ].join('');
+    }
+    if (pageKey === 'article_type') {
+      return [
+        '<td class="bs-checkbox"><input name="btSelectItem" type="checkbox" data-id="'+item.id+'"></td>',
+        '<td>'+item.id+'</td>',
+        '<td>'+escapeHTML(item.type_name)+'</td>',
+        '<td>'+escapeHTML((item.created_at||'').replace('T',' ').slice(0,19))+'</td>',
+        '<td><a href="javascript:;" class="btn btn-xs btn-danger btn-delone" data-id="'+item.id+'">删除</a></td>'
+      ].join('');
+    }
+    if (pageKey === 'article') {
+      return [
+        '<td class="bs-checkbox"><input name="btSelectItem" type="checkbox" data-id="'+item.id+'"></td>',
+        '<td>'+item.id+'</td>',
+        '<td>'+escapeHTML(item.type_name||'')+'</td>',
+        '<td>'+escapeHTML(item.title)+'</td>',
+        '<td>0</td>',
+        '<td>0</td>',
+        '<td>'+escapeHTML(statusLabel)+'</td>',
+        '<td>'+escapeHTML((item.created_at||'').replace('T',' ').slice(0,19))+'</td>',
+        '<td><a href="javascript:;" class="btn btn-xs btn-danger btn-delone" data-id="'+item.id+'">删除</a></td>'
+      ].join('');
+    }
+    if (!table || !table.tHead || !table.tHead.rows[0]) {
+      return '<td class="bs-checkbox"><input name="btSelectItem" type="checkbox" data-id="'+item.id+'"></td><td>'+item.id+'</td><td>'+escapeHTML(item.title||item.name||'')+'</td>'+operateCell(item);
+    }
+    return Array.from(table.tHead.rows[0].cells).map(function (th) {
+      var field = th.dataset.field;
+      if (th.classList.contains('bs-checkbox') || field === '0') {
+        return '<td class="bs-checkbox"><input name="btSelectItem" type="checkbox" data-id="'+item.id+'"></td>';
+      }
+      if (field === 'operate' || /操作/.test(th.textContent || '')) return operateCell(item);
+      if (!field) return '<td>'+item.id+'</td>';
+      if (field === 'status') return '<td>'+escapeHTML(statusLabel || nestedValue(item, field))+'</td>';
+      var value = nestedValue(item, field);
+      if (typeof value === 'string' && value.indexOf('\n') !== -1) value = value.split(/\r?\n/)[0];
+      return '<td>'+escapeHTML(value == null ? '' : String(value))+'</td>';
+    }).join('');
+  }
+  function loadRemoteRows() {
+    var listUrl = apiListUrl();
+    if (!listUrl || !table || !window.GeoAPI || /-add$|-edit|tougao|settle|configure/.test(pageKey)) return Promise.resolve();
+    return window.GeoAPI.request(listUrl).then(function (result) {
+      if (!result.ok) {
+        message((result.error && result.error.message) || '加载数据失败');
+        return;
+      }
+      var items = (result.data && result.data.items) || [];
+      var tbody = table.tBodies[0];
+      if (!tbody) return;
+      var colCount = table.tHead?.rows[0]?.cells.length || 6;
+      if (!items.length) {
+        tbody.innerHTML = '<tr class="no-records-found"><td colspan="'+colCount+'">没有找到匹配的记录</td></tr>';
+      } else {
+        tbody.innerHTML = items.map(function (item) {
+          return '<tr data-id="'+item.id+'">'+rowCellsFor(item)+'</tr>';
+        }).join('');
+      }
+      originalRows = tbody.innerHTML;
+      filtered = null;
+      page = 1;
+      refreshRows();
+    }).catch(function () { message('无法连接后端接口'); });
+  }
+  function saveRemoteRecord(form, button) {
+    var base = apiResourceBase();
+    if (!base || !window.GeoAPI) return Promise.resolve(null);
+    var body = buildApiBody(formData(form));
+    var editId = (form && form.dataset.id) || (button && button.dataset && button.dataset.id) || editRecordId() || '';
+    var pathMatch = location.pathname.match(/\/(?:ids|id)\/(\d+)/);
+    if (!editId && pathMatch) editId = pathMatch[1];
+    if (!editId && /-edit-ids-(\d+)/.test(pageKey)) editId = pageKey.match(/-edit-ids-(\d+)/)[1];
+    var method = editId ? 'PUT' : 'POST';
+    if (editId) body.id = Number(editId);
+    return window.GeoAPI.request(base, { method: method, body: body }).then(function (result) {
+      if (!result.ok) {
+        message((result.error && result.error.message) || '保存失败');
+        return null;
+      }
+      return result.data;
+    });
+  }
   function navigate(url) {
     var path = normalize(url);
     if (path === '/user/index/logout') {
+      if (window.GeoAPI) {
+        window.GeoAPI.logout().finally(function () {
+          sessionStorage.removeItem('geo-demo-session');
+          localStorage.removeItem('geo-demo-remember');
+          location.href = '/user/index/login/';
+        });
+        return;
+      }
       sessionStorage.removeItem('geo-demo-session');localStorage.removeItem('geo-demo-remember'); location.href='/user/index/login/';return;
     }
     if(path === '/user' || path === '/user/index/index')path='/user/dashboard';
@@ -77,7 +271,8 @@
     var title=control.dataset.title||control.title||control.textContent.trim()||'详情';
     activeModal={url:url,control:control,row:control.closest('tr'),index:null};
     var fastDialog=layout?/[?&]dialog=1(?:&|$)/.test(layout.url||''):true;
-    var frameUrl=file+'?localDialog=1&originalDialog='+(fastDialog?'1':'0');
+    var editId=control.dataset.id||(url.match(/\/(?:ids|id)\/(\d+)/)||[])[1]||'';
+    var frameUrl=file+'?localDialog=1&originalDialog='+(fastDialog?'1':'0')+(editId?'&editId='+encodeURIComponent(editId):'');
     var skin=layout&&Object.prototype.hasOwnProperty.call(layout,'skin')?layout.skin:'layui-layer-fast';
     if(skin.includes('layui-layer-fast'))skin+=' layui-layer-border';
     if(layer())activeModal.index=layer().open({type:2,title:title,area:area,offset:layout?[layout.top,layout.left]:'auto',skin:skin,shade:layout?.shade??0,shadeClose:true,maxmin:layout?.maxmin??true,content:frameUrl,success:function(layero,index){
@@ -114,7 +309,12 @@
     editors.forEach(function(item){if(item.editor.isReady)item.input.value=item.editor.getContent();});
     all('.edui-editor iframe').forEach(function(frame){try{var textarea=one('textarea',frame.closest('.form-group')||form||document);if(textarea&&frame.contentDocument)textarea.value=frame.contentDocument.body.innerHTML;}catch(e){}});
     var data={};all('input,textarea,select',form||document).forEach(function(input,i){
-      if(input.disabled || input.type==='password' || input.type==='hidden' || input.type==='file' || ((input.type==='checkbox'||input.type==='radio')&&!input.checked))return;
+      if(input.disabled || input.type==='password' || input.type==='file' || ((input.type==='checkbox'||input.type==='radio')&&!input.checked))return;
+      // Keep meaningful hidden fields (upload URLs, avatar) but skip CSRF/layout noise.
+      if(input.type==='hidden'){
+        var hiddenName=input.name||input.id||'';
+        if(!/^row\[/.test(hiddenName) && !/^c-/.test(hiddenName) && hiddenName!=='id')return;
+      }
       var key=input.name||input.id||input.className.split(' ')[0]||'field_'+i;
       data[key]=input.value;
     });
@@ -146,7 +346,13 @@
     try {
       var result=await window.GeoAI.request(mode||aiMode(),{page:pageKey,fields:input});
       status.textContent=result.ok?'处理完成':result.error.message;
-      if(result.ok){var output=one('textarea[data-ai-output],.ai-result,.result-content');if(output){if('value'in output)output.value=typeof result.data==='string'?result.data:JSON.stringify(result.data,null,2);else output.textContent=typeof result.data==='string'?result.data:JSON.stringify(result.data,null,2);}}
+      if(result.ok){
+        var payload=result.data;
+        var text=typeof payload==='string'?payload:(payload&&(payload.text||payload.content))||JSON.stringify(payload,null,2);
+        var output=one('textarea[data-ai-output],.ai-result,.result-content,.zhengliu_question_input,textarea[name="row[content]"],textarea[name="row[question]"]');
+        if(output){if('value'in output)output.value=text;else output.textContent=text;}
+        else message('AI 完成：'+String(text).slice(0,80));
+      }
       else message(result.error.message);
     } catch(e){status.textContent='AI 服务暂时不可用，请重试';message(status.textContent);}
     finally{button.disabled=false;button.removeAttribute('aria-busy');button.innerHTML=previous;}
@@ -168,7 +374,24 @@
     all('li.page-number').forEach(function(li){li.classList.toggle('active',+li.textContent===page);});
   }
   function filterTable(form){
-    if(!table)return;if(table.dataset.cardView==='true')toggleCardView();var criteria=all('input:not([type=hidden]),select',form).filter(function(el){return el.value.trim();});
+    if(!table)return;
+    if(table.dataset.cardView==='true')toggleCardView();
+    var criteria=all('input:not([type=hidden]),select',form).filter(function(el){return el.value.trim();});
+    if(apiResource()&&window.GeoAPI){
+      listQuery={};
+      criteria.forEach(function(el){
+        var name=(el.name||'').replace(/^row\[([^\]]+)\]$/,'$1');
+        if(!name)return;
+        if(name==='keyword'||name==='title'||name==='name'||name==='q'||name==='search')listQuery.q=el.value.trim();
+        else listQuery[name]=el.value.trim();
+      });
+      if(!listQuery.q){
+        var textInputs=criteria.filter(function(el){return el.tagName!=='SELECT';});
+        if(textInputs.length===1)listQuery.q=textInputs[0].value.trim();
+      }
+      loadRemoteRows().then(function(){message(Object.keys(listQuery).length?'已按条件查询':'已显示全部');});
+      return;
+    }
     var headers=all('thead th',table).map(function(th){return th.dataset.field;});
     filtered=function(row){return criteria.every(function(el){var index=headers.indexOf(el.name),cell=row.cells[index];var value=el.tagName==='SELECT'?el.options[el.selectedIndex].text:el.value;return (cell||row).textContent.toLowerCase().includes(value.toLowerCase());});};page=1;refreshRows();
   }
@@ -209,7 +432,34 @@
   function localSubmit(form,button){
     if(!validation(form))return;
     var values=formData(form);
-    if(/(?:ai_image|analyze|zhengliu|tuozhan|shoulu|zhishu|weixin_baowen|piliang_baowen|ai_task)(?:-|$)/.test(pageKey)){callAI(button,aiMode(),form);return;}
+    var isAiPage=/(?:ai_image|analyze|zhengliu|tuozhan|shoulu|zhishu|weixin_baowen|piliang_baowen|ai_task)(?:-|$)/.test(pageKey);
+    if(pageKey==='general-profile'&&window.GeoAPI){
+      var profileBody={nickname:(one('#nickname')||{}).value||'',avatar:(one('#c-avatar')||{}).value||''};
+      var password=(one('#password')||{}).value||'';
+      if(password)profileBody.password=password;
+      window.GeoAPI.profile(profileBody).then(function(result){
+        if(!result.ok){message((result.error&&result.error.message)||'保存失败');return;}
+        message('资料已保存');
+      }).catch(function(){message('无法连接后端接口');});
+      return;
+    }
+    if(apiResourceBase()&&window.GeoAPI){
+      saveRemoteRecord(form,button).then(function(record){
+        if(!record)return;
+        if(isAiPage){
+          callAI(button,aiMode(),form);
+          return;
+        }
+        if(parent!==window && new URLSearchParams(location.search).has('localDialog')){
+          parent.postMessage({type:'geo-local-save',values:values,record:record},location.origin);return;
+        }
+        message('已保存');
+        if(/-add$|-edit|tougao|settle|configure/.test(pageKey)) setTimeout(function(){history.back();},500);
+        else loadRemoteRows();
+      }).catch(function(){message('无法连接后端接口');});
+      return;
+    }
+    if(isAiPage){callAI(button,aiMode(),form);return;}
     if(parent!==window && new URLSearchParams(location.search).has('localDialog')){
       parent.postMessage({type:'geo-local-save',values:values},location.origin);return;
     }
@@ -217,7 +467,7 @@
     message(pageKey==='general-profile'?'本地资料已保存，密码未保存':'已保存本地演示数据');
   }
   document.addEventListener('submit',function(event){event.preventDefault();var form=event.target;if(form.matches('.form-commonsearch'))filterTable(form);else if(form.matches('.sidebar-form')){var query=one('input',form).value.trim();all('.sidebar-menu li').forEach(function(li){li.style.display=li.textContent.includes(query)?'':'none';});}else localSubmit(form,event.submitter||one('[type=submit]',form)||form);});
-  document.addEventListener('reset',function(event){if(event.target.matches('.form-commonsearch'))setTimeout(function(){filtered=null;page=1;refreshRows();},0);if(pageKey==='user_tdk-add'&&event.target.id==='entryForm'){event.preventDefault();tdkGroups.forEach(function(group){var container=one('#'+group+'Container');if(!container)return;all('.field-row',container).slice(1).forEach(function(row){row.remove();});all('.field-input',container).forEach(function(input){input.value='';});tdkSync(group);});['type_name','phone','zhuti'].forEach(function(id){var input=one('#'+id);if(input)input.value='';});message('已重置所有字段');}});
+  document.addEventListener('reset',function(event){if(event.target.matches('.form-commonsearch'))setTimeout(function(){filtered=null;listQuery={};page=1;if(apiResource())loadRemoteRows();else refreshRows();},0);if(pageKey==='user_tdk-add'&&event.target.id==='entryForm'){event.preventDefault();tdkGroups.forEach(function(group){var container=one('#'+group+'Container');if(!container)return;all('.field-row',container).slice(1).forEach(function(row){row.remove();});all('.field-input',container).forEach(function(input){input.value='';});tdkSync(group);});['type_name','phone','zhuti'].forEach(function(id){var input=one('#'+id);if(input)input.value='';});message('已重置所有字段');}});
   // The custom TDK entry form uses the captured inline row editor, not Form.events.validator.
   var tdkGroups=['keywords','citys','companys','descs'];
   var tdkAddButtons={addKeywordBtn:'keywords',addCityBtn:'citys',addCompanyBtn:'companys',addDescBtn:'descs'};
@@ -234,8 +484,51 @@
     if(el.matches('.keep-open input[data-field]')&&table){var index=all('thead th',table).findIndex(function(th){return th.dataset.field===el.dataset.field;});all('tr',table).forEach(function(tr){if(tr.cells[index])tr.cells[index].style.display=el.checked?'':'none';});}
     if(el.dataset.layout)body.classList.toggle(el.dataset.layout,el.checked);
     if(el.dataset.menu)all('.treeview-menu').forEach(function(ul){ul.style.display=el.checked?'block':'';});
-    if(el.type==='file')message(el.files.length?'已选择 '+el.files.length+' 个本地文件，尚未上传':'未选择文件');
+    if(el.type==='file'&&el.files&&el.files.length)uploadSelectedFiles(el);
   });
+  function ensureHiddenInput(id){
+    if(!id)return null;
+    var existing=document.getElementById(id);
+    if(existing)return existing;
+    var input=document.createElement('input');
+    input.type='hidden';input.id=id;input.name=id.indexOf('c-')===0?'row['+id.slice(2)+']':id;
+    (one('form')||body).appendChild(input);
+    return input;
+  }
+  function setUploadTarget(inputId,url,previewId){
+    var target=ensureHiddenInput(inputId)||one('#'+inputId)||one('[name="row['+inputId+']"]');
+    if(target){
+      if(target.value&&previewId)target.value=String(target.value).split(',').concat(url).filter(Boolean).join(',');
+      else target.value=url;
+      target.dispatchEvent(new Event('change',{bubbles:true}));
+    }
+    var preview=previewId&&one('#'+previewId);
+    if(preview){
+      var li=document.createElement('li');
+      li.className='col-xs-3';
+      li.innerHTML='<a href="'+escapeHTML(url)+'" target="_blank"><img src="'+escapeHTML(url)+'" class="img-responsive" alt=""></a>';
+      preview.appendChild(li);
+    }
+    var img=one('.profile-user-img,.img-circle.thumbnail,.thumbnail img');
+    if(inputId==='c-avatar'&&img)img.src=url;
+  }
+  function uploadSelectedFiles(fileInput,options){
+    options=options||{};
+    if(!window.GeoAPI||!fileInput.files||!fileInput.files.length){message('未选择文件');return Promise.resolve(null);}
+    message('正在上传…');
+    return window.GeoAPI.upload(fileInput.files,{category:options.category||'uploads'}).then(function(result){
+      if(!result.ok){message((result.error&&result.error.message)||'上传失败');return null;}
+      var items=result.data&&result.data.items?result.data.items:[result.data];
+      var urls=items.map(function(item){return item&&item.url;}).filter(Boolean);
+      if(!urls.length){message('上传失败');return null;}
+      var inputId=options.inputId||fileInput.dataset.inputId||(fileInput.closest('[data-input-id]')||{}).dataset?.inputId||'';
+      var previewId=options.previewId||fileInput.dataset.previewId||'';
+      if(inputId)urls.forEach(function(url){setUploadTarget(inputId,url,previewId);});
+      else if(fileInput.dataset.target)urls.forEach(function(url){setUploadTarget(fileInput.dataset.target,url,previewId);});
+      message('上传成功');
+      return urls;
+    }).catch(function(){message('无法连接上传接口');return null;});
+  }
   document.addEventListener('click',function(event){
     var el=event.target.closest('a,button,[data-url],[data-local-url],[data-original-click],.item-ai-dis,.filter_search_list li,.sortable,[data-tab],.edui-button,.strat_zhengliu,.submit_btn,.shoudong_zhengliu');
     if(!el)return;
@@ -243,7 +536,7 @@
     if(el.matches('.disabled,[disabled]')){event.preventDefault();return;}
     var url=actionURL(el), text=el.textContent.trim(), handler=el.dataset.originalClick||'';
     if(pageKey==='user_tdk-add'&&el.closest('#entryForm')){if(tdkAddButtons[el.id]){event.preventDefault();tdkAdd(tdkAddButtons[el.id]);return;}if(el.matches('.btn-remove')){event.preventDefault();var tdkRow=el.closest('.field-row'),tdkGroup=tdkRow?.dataset.group;if(tdkGroup&&all('#'+tdkGroup+'Container .field-row').length>1){tdkRow.remove();tdkSync(tdkGroup);}return;}}
-    if(el.matches('.strat_zhengliu,.submit_btn')){event.preventDefault();var keywordInput=one(el.matches('.strat_zhengliu')?'#c-keyword':'#keyword');if(!keywordInput?.value.trim()){message(el.matches('.strat_zhengliu')?'请输入主关键词':'请输入关键词');return;}callAI(el,'generate',el.closest('form'));return;}
+    if(el.matches('.strat_zhengliu,.submit_btn')){event.preventDefault();var keywordInput=one(el.matches('.strat_zhengliu')?'#c-keyword':'#keyword');if(!keywordInput?.value.trim()){message(el.matches('.strat_zhengliu')?'请输入主关键词':'请输入关键词');return;}var aiForm=el.closest('form')||document;if(apiResourceBase()){saveRemoteRecord(aiForm,el).then(function(record){if(record)callAI(el,'generate',aiForm);});}else callAI(el,'generate',aiForm);return;}
     if(el.matches('.shoudong_zhengliu')){event.preventDefault();manualKeywords();return;}
     if(el.id==='openDocBtn'){event.preventDefault();one('#modalOverlay').style.display='flex';one('#docContent').scrollTop=0;return;}
     if(el.id==='closeModalBtn'||(el.id==='submitBtn'&&pageKey.startsWith('user_huaxiang'))){event.preventDefault();one('#modalOverlay').style.display='none';return;}
@@ -268,24 +561,85 @@
     }
     if(el.matches('.btn-add')){event.preventDefault();modal(addURL(),el);return;}
     if(el.matches('.btn-dialog,.btn-editone,.btn-edit')){event.preventDefault();modal(url,el);return;}
-    if(el.matches('.btn-del,.btn-delone')){event.preventDefault();deleteRows(el.matches('.btn-delone')?[el.closest('tr')]:selected());return;}
-    if(el.matches('.btn-refresh')){event.preventDefault();filtered=null;page=1;refreshRows();message('已刷新本地数据');return;}
+    if(el.matches('.btn-del,.btn-delone')){
+      event.preventDefault();
+      var targets=el.matches('.btn-delone')?[el.closest('tr')]:selected();
+      var resource=apiResourceBase();
+      if(resource&&window.GeoAPI){
+        var ids=targets.map(function(row){return Number(row.dataset.id||one('[data-id]',row)?.dataset.id||one('input[data-id]',row)?.dataset.id);}).filter(Boolean);
+        if(!ids.length){message('请先选择记录');return;}
+        window.GeoAPI.request(resource,{method:'DELETE',body:{ids:ids}}).then(function(result){
+          if(!result.ok){message((result.error&&result.error.message)||'删除失败');return;}
+          message('已删除');
+          loadRemoteRows();
+        }).catch(function(){message('无法连接后端接口');});
+        return;
+      }
+      deleteRows(targets);return;
+    }
+    if(el.matches('.btn-refresh')){event.preventDefault();filtered=null;page=1;if(apiResource())loadRemoteRows().then(function(){message('已刷新');});else{refreshRows();message('已刷新本地数据');}return;}
     if(el.matches('[name=commonSearch]')){event.preventDefault();var search=one('.commonsearch-table');if(search)search.classList.toggle('hidden');return;}
     if(el.matches('[name=toggle]')){event.preventDefault();toggleCardView();return;}
     if(el.closest('.export')&&el.matches('a')){event.preventDefault();exportRows();return;}
     if(el.matches('.sortable')&&table){var th=el.closest('th'),index=Array.from(th.parentElement.cells).indexOf(th),desc=el.dataset.direction!=='desc';el.dataset.direction=desc?'desc':'asc';rows().sort(function(a,b){return a.cells[index].textContent.localeCompare(b.cells[index].textContent,'zh-CN',{numeric:true})*(desc?-1:1);}).forEach(function(row){table.tBodies[0].appendChild(row);});refreshRows();return;}
     if(el.closest('.pagination')&&table){event.preventDefault();if(el.closest('.page-next'))page++;else if(el.closest('.page-pre'))page--;else if(el.closest('.jumpto'))page=+one('input',el.closest('.jumpto')).value||1;else if(/^\d+$/.test(text))page=+text;refreshRows();return;}
     if(el.matches('.searchit')){event.preventDefault();var field=all('.form-commonsearch [name]').find(function(x){return x.name===el.dataset.field;});if(field){field.value=el.dataset.value;filterTable(field.form);}return;}
-    if(el.matches('.btn-change')){event.preventDefault();var icon=one('i',el);if(icon){icon.classList.toggle('fa-toggle-on');icon.classList.toggle('fa-toggle-off');icon.classList.toggle('text-success');}saveRows();return;}
-    if(el.matches('.btn-multi')){event.preventDefault();selected().forEach(function(row){row.dataset.status=el.dataset.params;});saveRows();message('已更新本地选中记录');return;}
-    if(el.matches('.query-button,.pingpai_jiexi')){event.preventDefault();callAI(el,el.matches('.pingpai_jiexi')?'analyze':'detect');return;}
+    if(el.matches('.btn-change')){
+      event.preventDefault();
+      var changeId=el.dataset.id||el.closest('tr')?.dataset.id;
+      var params={};String(el.dataset.params||'').split('&').forEach(function(pair){var parts=pair.split('=');if(parts[0])params[parts[0]]=parts[1];});
+      var nextStatus=params.status!=null?Number(params.status):null;
+      if(apiResourceBase()&&window.GeoAPI&&changeId&&nextStatus!=null){
+        window.GeoAPI.request(apiResourceBase(),{method:'PUT',body:{id:Number(changeId),status:nextStatus}}).then(function(result){
+          if(!result.ok){message((result.error&&result.error.message)||'状态更新失败');return;}
+          var icon=one('i',el);if(icon){icon.classList.toggle('fa-toggle-on');icon.classList.toggle('fa-toggle-off');icon.classList.toggle('text-success');}
+          el.dataset.params='status='+(nextStatus?0:1);
+          message('状态已更新');
+          loadRemoteRows();
+        }).catch(function(){message('无法连接后端接口');});
+        return;
+      }
+      var icon=one('i',el);if(icon){icon.classList.toggle('fa-toggle-on');icon.classList.toggle('fa-toggle-off');icon.classList.toggle('text-success');}saveRows();return;
+    }
+    if(el.matches('.btn-multi')){
+      event.preventDefault();
+      var targets=selected();
+      if(!targets.length){message('请先选择记录');return;}
+      var multiParams={};String(el.dataset.params||'').split('&').forEach(function(pair){var parts=pair.split('=');if(parts[0])multiParams[parts[0]]=parts[1];});
+      var statusMap={normal:1,hidden:0,'1':1,'0':0,enable:1,disable:0};
+      var statusValue=multiParams.status;
+      if(Object.prototype.hasOwnProperty.call(statusMap,String(statusValue)))statusValue=statusMap[String(statusValue)];
+      else statusValue=Number(statusValue);
+      if(apiResourceBase()&&window.GeoAPI&&!Number.isNaN(statusValue)){
+        var ids=targets.map(function(row){return Number(row.dataset.id||one('[data-id]',row)?.dataset.id);}).filter(Boolean);
+        Promise.all(ids.map(function(id){
+          return window.GeoAPI.request(apiResourceBase(),{method:'PUT',body:{id:id,status:statusValue}});
+        })).then(function(results){
+          if(results.some(function(r){return !r.ok;}))message('部分记录更新失败');
+          else message('已更新选中记录');
+          loadRemoteRows();
+        }).catch(function(){message('无法连接后端接口');});
+        return;
+      }
+      targets.forEach(function(row){row.dataset.status=el.dataset.params;});saveRows();message('已更新本地选中记录');return;
+    }
+    if(el.matches('.faupload,[data-upload],#faupload-avatar')){
+      event.preventDefault();
+      var accept=el.dataset.mimetype||'image/*,.jpg,.png,.gif,.jpeg,.webp,.bmp';
+      var picker=document.createElement('input');
+      picker.type='file';picker.accept=accept;picker.multiple=el.dataset.multiple==='true';
+      picker.onchange=function(){uploadSelectedFiles(picker,{inputId:el.dataset.inputId,previewId:el.dataset.previewId,category:el.dataset.category||'uploads'});};
+      picker.click();
+      return;
+    }
+    if(el.matches('.query-button,.pingpai_jiexi')){event.preventDefault();var detectForm=el.closest('form')||document;var detectMode=el.matches('.pingpai_jiexi')?'analyze':'detect';if(apiResourceBase()){saveRemoteRecord(detectForm,el).then(function(record){if(record)callAI(el,detectMode,detectForm);});}else callAI(el,detectMode,detectForm);return;}
     if(el.matches('.item-ai-dis')){event.preventDefault();el.classList.toggle('select-border-bar');el.setAttribute('aria-pressed',String(el.classList.contains('select-border-bar')));return;}
     if(el.matches('.filter_search_list li')){event.preventDefault();all('li',el.parentElement).forEach(function(li){li.classList.remove('active','selected');});el.classList.add('active','selected');return;}
     if(el.matches('.search_btn,.close_btn')){event.preventDefault();if(el.matches('.close_btn'))all('.filter_search input').forEach(function(i){i.value='';});var query=all('input:not([type=hidden])').map(function(i){return i.value.trim();}).filter(Boolean).join(' ').toLowerCase();all('tr',one('.media-list')||one('table')||document).filter(function(r){return !r.closest('thead');}).forEach(function(row){row.style.display=!query||row.textContent.toLowerCase().includes(query)?'':'none';});return;}
-    if(/media_collection|cancel_collection/.test(handler)){event.preventDefault();el.classList.toggle('geo-favorite');el.setAttribute('aria-pressed',String(el.classList.contains('geo-favorite')));message(el.classList.contains('geo-favorite')?'已加入本地收藏':'已取消本地收藏');return;}
+    if(/media_collection|cancel_collection/.test(handler)){event.preventDefault();el.classList.toggle('geo-favorite');el.setAttribute('aria-pressed',String(el.classList.contains('geo-favorite')));var favorited=el.classList.contains('geo-favorite');if(favorited&&apiResourceBase()&&window.GeoAPI){window.GeoAPI.request(apiResourceBase(),{method:'POST',body:{title:el.dataset.title||el.textContent.trim()||'媒体收藏',media_name:el.dataset.title||'',status:1,subtype:apiSubtype()}}).then(function(result){message(result.ok?'已加入收藏':'收藏失败');}).catch(function(){message('已加入本地收藏');});}else message(favorited?'已加入本地收藏':'已取消本地收藏');return;}
     if(/^\/user\//.test(url)){event.preventDefault();navigate(url);return;}
     if(/history\.back/.test(url)||text==='返回上一级'){event.preventDefault();history.back();return;}
-    if(/生成|开始创作|立即创作|立即分析|一键检测|开始查询|开始拓词/.test(text)&&el.matches('button,.btn')){event.preventDefault();callAI(el,aiMode(),el.closest('form'));return;}
+    if(/生成|开始创作|立即创作|立即分析|一键检测|开始查询|开始拓词/.test(text)&&el.matches('button,.btn')){event.preventDefault();var genForm=el.closest('form')||document;if(apiResourceBase()){saveRemoteRecord(genForm,el).then(function(record){if(record)callAI(el,aiMode(),genForm);});}else callAI(el,aiMode(),genForm);return;}
     if(el.matches('button[type=reset]'))return;
     if(el.matches('a')&&(/^javascript:/i.test(url)||url==='#'))event.preventDefault();
   });
@@ -293,6 +647,7 @@
   window.addEventListener('message',function(event){
     if(event.origin!==location.origin||!activeModal||!event.data||event.data.type!=='geo-local-save')return;
     var frame=activeModal.dialog?one('iframe',activeModal.dialog):one('#layui-layer'+activeModal.index+' iframe');if(!frame||event.source!==frame.contentWindow)return;
+    if(apiResource()){closeModal();loadRemoteRows();message('已保存');return;}
     applyLocalFields(event.data.values,activeModal.row);closeModal();message('已保存本地演示记录');
   });
   window.addEventListener('hashchange',function(){if(shell)navigate(decodeURIComponent(location.hash.slice(1))||'/user/dashboard');});
@@ -318,7 +673,7 @@
     var input=one('textarea',old.closest('.form-group')||old.parentElement);if(!input)return;
     var holder=one('.edui-editor-iframeholder',old),height=holder?parseInt(holder.style.height,10)||800:800;
     var mount=document.createElement('script');mount.type='text/plain';mount.id='geo-editor-'+index;old.replaceWith(mount);
-    var editor=window.UE.getEditor(mount.id,{serverUrl:'',imageUrl:'',initialFrameWidth:'100%',initialFrameHeight:height,autoHeightEnabled:false,initialContent:input.value,elementPathEnabled:true,wordCount:true});
+    var editor=window.UE.getEditor(mount.id,{serverUrl:'/api/ueditor',imageUrl:'/api/ueditor?action=uploadimage',initialFrameWidth:'100%',initialFrameHeight:height,autoHeightEnabled:false,initialContent:input.value,elementPathEnabled:true,wordCount:true});
     editors.push({editor:editor,input:input});
     editor.ready(function(){editor.addListener('contentChange',function(){input.value=editor.getContent();});});
   });} else all('.edui-editor iframe').forEach(function(frame){function enable(){try{frame.contentDocument.body.contentEditable='true';frame.contentDocument.body.style.cssText='font:16px/1.6 sans-serif;padding:8px;';}catch(e){}}frame.addEventListener('load',enable);enable();});
@@ -330,7 +685,170 @@
     form.classList.add('nice-validator','n-default','n-bootstrap');
     all('.layer-footer [type="submit"],.fixed-footer [type="submit"],.normal-footer [type="submit"]',form).forEach(function(button){button.classList.remove('disabled');});
   });
-  if(table){try{var saved=localStorage.getItem(stateKey);if(saved){table.tBodies[0].innerHTML=saved;refreshRows();}}catch(e){}}
+  function fillFormFromRecord(record){
+    if(!record||typeof record!=='object')return;
+    var source=Object.assign({},record.data||{},record);
+    Object.keys(source).forEach(function(key){
+      if(key==='data'||key==='id'||key==='module'||key==='created_at'||key==='updated_at')return;
+      var value=source[key];
+      if(value==null)return;
+      var text=typeof value==='object'?JSON.stringify(value):String(value);
+      var candidates=[
+        one('#c-'+key),
+        one('[name="row['+key+']"]'),
+        one('[name="'+key+'"]'),
+        one('#'+key)
+      ].filter(Boolean);
+      candidates.forEach(function(input){
+        if(input.type==='radio'||input.type==='checkbox'){
+          all('input[name="'+input.name+'"]').forEach(function(el){el.checked=String(el.value)===text;});
+          return;
+        }
+        if(input.tagName==='SELECT'){
+          var matched=Array.from(input.options).find(function(opt){return String(opt.value)===text||opt.text.trim()===text;});
+          if(matched)input.value=matched.value;
+          else {input.value=text;}
+          if(window.jQuery&&window.jQuery.fn.selectpicker)window.jQuery(input).selectpicker('refresh');
+          else updateSelect(input);
+          return;
+        }
+        input.value=text;
+      });
+      if(key==='content'||key==='question'||key==='zhengliu_question'){
+        editors.forEach(function(item){try{item.editor.setContent(text);item.input.value=text;}catch(e){}});
+      }
+    });
+    var form=one('form');
+    if(form)form.dataset.id=String(record.id||'');
+    body.dataset.id=String(record.id||'');
+  }
+  function hydrateEditForm(){
+    if(!/-edit|editId=/.test(pageKey+location.search))return Promise.resolve();
+    var id=editRecordId();
+    var resource=apiResource();
+    if(!id||!resource||!window.GeoAPI)return Promise.resolve();
+    return window.GeoAPI.getRecord(resource,id).then(function(result){
+      if(!result.ok){message((result.error&&result.error.message)||'加载编辑数据失败');return;}
+      fillFormFromRecord(result.data);
+    }).catch(function(){message('无法加载编辑数据');});
+  }
+  function loadSelectOptions(){
+    if(!window.GeoAPI)return Promise.resolve();
+    var tasks=[];
+    var keywordSelect=one('select[name="row[company_keyword_id]"],#c-company_keyword_id');
+    if(keywordSelect){
+      tasks.push(window.GeoAPI.request('/api/keywords/options').then(function(result){
+        if(!result.ok)return;
+        var current=keywordSelect.value;
+        var keepFirst=keywordSelect.options[0]&&(!keywordSelect.options[0].value||keywordSelect.options[0].value==='0');
+        var first=keepFirst?keywordSelect.options[0].outerHTML:'<option value="0">请选择</option>';
+        keywordSelect.innerHTML=first+((result.data&&result.data.items)||[]).map(function(item){
+          return '<option value="'+item.id+'">'+escapeHTML(item.label)+'</option>';
+        }).join('');
+        if(current)keywordSelect.value=current;
+        if(window.jQuery&&window.jQuery.fn.selectpicker)window.jQuery(keywordSelect).selectpicker('refresh');
+      }));
+    }
+    var typeSelect=one('select[name="row[type_id]"],#c-type_id');
+    if(typeSelect&&/article/.test(pageKey)){
+      tasks.push(window.GeoAPI.request('/api/article-types/options').then(function(result){
+        if(!result.ok)return;
+        var current=typeSelect.value;
+        typeSelect.innerHTML='<option value="0">不选择</option>'+((result.data&&result.data.items)||[]).map(function(item){
+          return '<option value="'+item.id+'">'+escapeHTML(item.label)+'</option>';
+        }).join('');
+        if(current)typeSelect.value=current;
+        if(window.jQuery&&window.jQuery.fn.selectpicker)window.jQuery(typeSelect).selectpicker('refresh');
+      }));
+    }
+    var imageTypeSelect=one('select[name="row[images_type_id]"],select[name="row[image_type_id]"],#c-images_type_id,#c-image_type_id');
+    if(imageTypeSelect){
+      tasks.push(window.GeoAPI.request('/api/modules/images_type/options').then(function(result){
+        if(!result.ok)return;
+        var current=imageTypeSelect.value;
+        imageTypeSelect.innerHTML='<option value="0">不选择</option>'+((result.data&&result.data.items)||[]).map(function(item){
+          return '<option value="'+item.id+'">'+escapeHTML(item.label)+'</option>';
+        }).join('');
+        if(current)imageTypeSelect.value=current;
+        if(window.jQuery&&window.jQuery.fn.selectpicker)window.jQuery(imageTypeSelect).selectpicker('refresh');
+      }));
+    }
+    return Promise.all(tasks);
+  }
+  function applyUserChrome(user){
+    if(!user)return;
+    var name=user.nickname||user.username||'';
+    all('.user-menu .hidden-xs,.user-header p').forEach(function(el){
+      if(el.matches('p')){
+        var smalls=all('small',el);
+        el.childNodes.forEach(function(node){
+          if(node.nodeType===3&&node.textContent.trim())node.textContent='\n                                    '+name+'                                    ';
+        });
+        if(smalls[1])smalls[1].textContent='剩余点数：'+Number(user.score||0)+'点';
+        if(smalls[2])smalls[2].textContent='余额：'+Number(user.balance||0).toFixed(2)+'元';
+      }else el.textContent=name;
+    });
+    if(user.avatar){
+      all('.user-menu .user-image,.user-header img').forEach(function(img){img.src=user.avatar;});
+    }
+  }
+  function fillDashboard(){
+    if(pageKey!=='dashboard'||!window.GeoAPI)return Promise.resolve();
+    return window.GeoAPI.dashboard().then(function(result){
+      if(!result.ok||!result.data)return;
+      var data=result.data;
+      var user=data.user||{};
+      var stats=data.stats||{};
+      var cards=all('.balance-card .balance-num');
+      if(cards[0])cards[0].textContent='¥ '+Number(user.balance||0).toFixed(2);
+      if(cards[1])cards[1].textContent=String(Number(user.score||0));
+      var foots=all('.balance-card .balance-foot span');
+      if(foots[0])foots[0].textContent='本月变动 ¥'+Number(stats.month_money_delta||0).toFixed(2);
+      if(foots[1])foots[1].textContent='本月变动 '+Number(stats.month_score_delta||0)+'点';
+      var quickBalance=one('.quick-grid .quick b');
+      if(quickBalance)quickBalance.textContent=Number(user.balance||0).toFixed(2)+'元';
+      var chart=data.chart||{};
+      var series=chart.series||[];
+      var max=Math.max.apply(null,series.concat([1]));
+      var line=one('#lineChart path,svg#lineChart path,.chart-line path');
+      if(line&&series.length){
+        var points=series.map(function(value,index){
+          var x=(index/(series.length-1||1))*100;
+          var y=100-(Number(value)/max)*80-10;
+          return x+','+y;
+        }).join(' ');
+        line.setAttribute('d','M '+points.replace(/ /g,' L '));
+      }
+      all('.bar-chart .bar, .bars .bar, [data-chart-bar]').forEach(function(bar,index){
+        var value=series[index]||0;
+        bar.style.height=Math.max(4,Math.round((Number(value)/max)*100))+'%';
+        bar.title=String(value);
+      });
+    }).catch(function(){});
+  }
+  if(table&&!apiResource()){try{var saved=localStorage.getItem(stateKey);if(saved){table.tBodies[0].innerHTML=saved;refreshRows();}}catch(e){}}
+  ensureAuth().then(function(ok){
+    if(!ok)return;
+    if(shell&&window.GeoAPI){
+      window.GeoAPI.me().then(function(result){if(result.ok)applyUserChrome(result.data);});
+    }
+    var chain=Promise.resolve();
+    if(/-add$|-edit|tougao|settle|configure/.test(pageKey)||new URLSearchParams(location.search).has('editId')){
+      chain=chain.then(loadSelectOptions).then(hydrateEditForm);
+    }
+    if(apiResource()&&!/-add$|-edit|tougao|settle|configure/.test(pageKey))chain=chain.then(loadRemoteRows);
+    if(pageKey==='dashboard')chain=chain.then(fillDashboard);
+    if(pageKey==='general-profile'&&window.GeoAPI){
+      chain=chain.then(function(){return window.GeoAPI.me();}).then(function(result){
+        if(!result.ok)return;
+        var user=result.data||{};
+        var nick=one('#nickname');if(nick)nick.value=user.nickname||user.username||'';
+        ensureHiddenInput('c-avatar').value=user.avatar||'';
+        if(user.avatar){var img=one('.profile-user-img,.img-circle.thumbnail');if(img)img.src=user.avatar;}
+      });
+    }
+    return chain;
+  });
   fetch('/backend-routes.json').then(function(response){if(!response.ok)throw new Error('route map');return response.json();}).then(function(result){
     routes=result.routes||result;
     if(Array.isArray(routes))routes=Object.fromEntries(routes.map(function(r){return [r.path,r.file||'/backend-pages/'+r.key+'.html'];}));

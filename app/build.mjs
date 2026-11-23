@@ -11,7 +11,7 @@ for (const file of ['index.html', 'user/index/login/index.html']) {
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, login);
 }
-for (const file of ['login.css', 'login.js', 'ai-config.js', 'robots.txt', 'favicon.svg']) {
+for (const file of ['login.css', 'login.js', 'geo-api.js', 'ai-config.js', 'robots.txt', 'favicon.svg']) {
   await cp(resolve(source, file), resolve(output, file));
 }
 await mkdir(resolve(output, 'services'), { recursive: true });
@@ -26,9 +26,25 @@ console.log('Static build ready: dist; login, backend and configurable AI servic
 const backendMapPath = resolve(source, 'backend-routes.json');
 try {
   const backendMap = JSON.parse(await readFile(backendMapPath, 'utf8'));
+  function withGeoApi(html) {
+    if (html.includes('/geo-api.js')) return html;
+    return html.replace('<script src="/ai-config.js"></script>', '<script src="/geo-api.js"></script><script src="/ai-config.js"></script>');
+  }
   for (const dir of ['backend-pages', 'site-assets']) await cp(resolve(source, dir), resolve(output, dir), { recursive: true });
   for (const file of ['admin-runtime.js','admin-runtime.css','backend-routes.json','backend-page-manifest.json','backend-interactions.json']) await cp(resolve(source,file),resolve(output,file));
-  const shell = await readFile(resolve(source, 'shell.html'), 'utf8');
+  const { readdir } = await import('node:fs/promises');
+  async function injectDir(dir) {
+    for (const name of await readdir(dir)) {
+      const full = resolve(dir, name);
+      if (name.endsWith('.html')) {
+        const html = await readFile(full, 'utf8');
+        const next = withGeoApi(html);
+        if (next !== html) await writeFile(full, next);
+      }
+    }
+  }
+  await injectDir(resolve(output, 'backend-pages'));
+  const shell = withGeoApi(await readFile(resolve(source, 'shell.html'), 'utf8'));
   for (const route of ['user/index/index','user','demo']) {
     await mkdir(resolve(output,route),{recursive:true});
     await writeFile(resolve(output,route,'index.html'),shell);
@@ -37,7 +53,8 @@ try {
     const dest = resolve(output, route.replace(/^\//,''), 'index.html');
     if(!dest.startsWith(output)) throw new Error('Invalid backend route');
     await mkdir(dirname(dest),{recursive:true});
-    await cp(resolve(source,file.replace(/^\//,'')),dest);
+    const html = withGeoApi(await readFile(resolve(source, file.replace(/^\//,'')), 'utf8'));
+    await writeFile(dest, html);
   }
   console.log('Backend pages built: '+Object.keys(backendMap).length);
 } catch(error) {
