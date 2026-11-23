@@ -1,0 +1,18 @@
+# CA internal metadata (contains sampling-session records) — never publish
+craft.json
+investigation.cany/
+feed.json
+usage.json
+build-activity.log
+inbox/
+
+# Local-only evidence (437MB) — kept on disk, not in repo
+capture/
+
+# Dependencies & logs
+node_modules/
+*.log
+
+# OS noise
+Thumbs.db
+.DS_Store
