@@ -13,8 +13,6 @@ jobs:
   deploy:
     name: Deploy to 110.40.173.15
     runs-on: ubuntu-latest
-    # Skip quietly until the server SSH key is stored as a repository secret.
-    if: ${{ secrets.DEPLOY_SSH_KEY != '' }}
     steps:
       - name: Pull and restart on the server
         uses: appleboy/ssh-action@v1.2.2

@@ -193,7 +193,7 @@ AI_UPSTREAM_MODEL=gpt-4o-mini
 
 `main` 分支每次 push 会触发 [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml)：Actions 用 SSH 登录 `ubuntu@110.40.173.15:22`，在 `~/geoSys/geoSys` 执行 `git reset --hard origin/main`，再跑 [`deploy/remote-deploy.sh`](../deploy/remote-deploy.sh)（安装依赖、迁移、收集静态文件、重启 gunicorn，并重载 nginx）。
 
-密钥只放在 GitHub，不进仓库。未配置 `DEPLOY_SSH_KEY` 时，这次 workflow 会跳过，不会把流水线标红。
+密钥只放在 GitHub，不进仓库。Repository secrets 里只需要 `DEPLOY_SSH_KEY`。
 
 ### 服务器首次准备（SSH 登录后执行一次）
 
