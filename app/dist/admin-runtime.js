@@ -419,7 +419,50 @@
     var csv='\uFEFF'+lines.map(function(row){return row.map(function(value){return '"'+value.replace(/"/g,'""')+'"';}).join(',');}).join('\r\n');
     var url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));var a=document.createElement('a');a.href=url;a.download=pageKey+'.csv';a.click();setTimeout(function(){URL.revokeObjectURL(url);},1000);
   }
-  function actionURL(control){return control.dataset.localUrl||control.dataset.url||control.getAttribute('href')||'';}
+  function actionURL(control){
+    return control.dataset.localUrl || control.dataset.url || control.getAttribute('url') || control.getAttribute('href') || '';
+  }
+  function sidebarHref(anchor){
+    var raw = actionURL(anchor) || '';
+    // Ignore treeview toggles that only expand/collapse.
+    if (!raw || raw === '#' || /^javascript:/i.test(raw)) return '';
+    try {
+      var path = new URL(raw, location.origin).pathname.replace(/\/$/, '') || '/';
+      return path.indexOf('/user/') === 0 ? path : '';
+    } catch (e) {
+      return '';
+    }
+  }
+  function bindSidebarNavigation(){
+    if (!shell) return;
+    // Captured HTML uses target="__self" (named window). That opens a real popup
+    // whenever the click is not intercepted — normalize it back to in-frame nav.
+    all('.sidebar-menu a[href], .navbar-custom-menu a[href], .user-footer a[href]').forEach(function(anchor){
+      var target = (anchor.getAttribute('target') || '').trim();
+      if (target === '__self' || target === '_blank') anchor.removeAttribute('target');
+    });
+  }
+  function fixSidebarScroll(){
+    if (!shell) return;
+    var height = 'calc(100vh - 50px)';
+    // Unwrap frozen slimScroll shell so the gray rail/bar cannot come back.
+    all('.main-sidebar .slimScrollDiv').forEach(function(box){
+      var side = one('.sidebar', box);
+      if (!side || !box.parentNode) return;
+      all('.slimScrollBar, .slimScrollRail', box).forEach(function(el){ el.remove(); });
+      box.parentNode.insertBefore(side, box);
+      box.remove();
+    });
+    all('.main-sidebar .sidebar').forEach(function(side){
+      side.style.height = height;
+      side.style.maxHeight = height;
+      side.style.overflowY = 'auto';
+      side.style.overflowX = 'hidden';
+      if (window.jQuery) {
+        try { window.jQuery(side).off('mouseenter mouseleave mousedown touchstart mousewheel DOMMouseScroll'); } catch (e) {}
+      }
+    });
+  }
   function addURL(){
     var current=Object.keys(routes).find(function(path){return routeFor(path)?.split('?')[0].endsWith('/'+pageKey+'.html');});
     if(!current)return '';
@@ -529,11 +572,24 @@
       return urls;
     }).catch(function(){message('无法连接上传接口');return null;});
   }
+  // Capture phase: sidebar must always switch the main iframe, never open a popup/tab.
+  document.addEventListener('click', function(event){
+    if (!shell) return;
+    var anchor = event.target.closest && event.target.closest('.sidebar-menu a, .navbar-custom-menu a[href^="/user/"], .user-footer a[href^="/user/"]');
+    if (!anchor) return;
+    var path = sidebarHref(anchor);
+    if (!path) return;
+    event.preventDefault();
+    event.stopPropagation();
+    navigate(path);
+  }, true);
   document.addEventListener('click',function(event){
     var el=event.target.closest('a,button,[data-url],[data-local-url],[data-original-click],.item-ai-dis,.filter_search_list li,.sortable,[data-tab],.edui-button,.strat_zhengliu,.submit_btn,.shoudong_zhengliu');
     if(!el)return;
     if(el.matches('button')&&!actionURL(el)&&el.closest('.btn-dialog'))el=el.closest('.btn-dialog');
     if(el.matches('.disabled,[disabled]')){event.preventDefault();return;}
+    // Already handled in capture for shell sidebar / header user links.
+    if(shell && el.closest && el.closest('.sidebar-menu a, .navbar-custom-menu a[href^="/user/"], .user-footer a[href^="/user/"]') && sidebarHref(el.closest('a')||el))return;
     var url=actionURL(el), text=el.textContent.trim(), handler=el.dataset.originalClick||'';
     if(pageKey==='user_tdk-add'&&el.closest('#entryForm')){if(tdkAddButtons[el.id]){event.preventDefault();tdkAdd(tdkAddButtons[el.id]);return;}if(el.matches('.btn-remove')){event.preventDefault();var tdkRow=el.closest('.field-row'),tdkGroup=tdkRow?.dataset.group;if(tdkGroup&&all('#'+tdkGroup+'Container .field-row').length>1){tdkRow.remove();tdkSync(tdkGroup);}return;}}
     if(el.matches('.strat_zhengliu,.submit_btn')){event.preventDefault();var keywordInput=one(el.matches('.strat_zhengliu')?'#c-keyword':'#keyword');if(!keywordInput?.value.trim()){message(el.matches('.strat_zhengliu')?'请输入主关键词':'请输入关键词');return;}var aiForm=el.closest('form')||document;if(apiResourceBase()){saveRemoteRecord(aiForm,el).then(function(record){if(record)callAI(el,'generate',aiForm);});}else callAI(el,'generate',aiForm);return;}
@@ -826,6 +882,9 @@
       });
     }).catch(function(){});
   }
+  bindSidebarNavigation();
+  fixSidebarScroll();
+  window.addEventListener('resize', fixSidebarScroll);
   if(table&&!apiResource()){try{var saved=localStorage.getItem(stateKey);if(saved){table.tBodies[0].innerHTML=saved;refreshRows();}}catch(e){}}
   ensureAuth().then(function(ok){
     if(!ok)return;

@@ -81,7 +81,7 @@ class Command(BaseCommand):
             owner=user,
             keyword='GEO优化',
             defaults={
-                'hit_word': '鑫火GEO',
+                'hit_word': '宝邦GEO',
                 'tuozhan_status': 0,
                 'zhengliu_question': '什么是GEO优化\nGEO优化有什么好处',
             },
