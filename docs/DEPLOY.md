@@ -205,7 +205,7 @@ bash deploy/bootstrap.sh
 
 `bootstrap.sh` 会安装 Python 虚拟环境依赖和 nginx。若还没有 `backend/.env`，会从示例生成一份（`DJANGO_DEBUG=false`，允许主机包含 `110.40.173.15`）。已有 `.env` 不会被覆盖。
 
-MySQL 需事先建好库 `geo_sys`，并把密码写进 `backend/.env` 的 `MYSQL_PASSWORD`。需要演示账号时再执行：
+部署脚本会在本机安装并启动 MySQL，按 `backend/.env` 创建数据库和账号。`MYSQL_PASSWORD` 为空时会生成一个密码写回 `.env`，不会打印出来。需要演示账号时再执行：
 
 ```bash
 bash deploy/bootstrap.sh --init-demo

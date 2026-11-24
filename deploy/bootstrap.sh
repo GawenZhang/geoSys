@@ -39,9 +39,7 @@ else
 fi
 
 if ! systemctl is-active --quiet mysql && ! systemctl is-active --quiet mariadb; then
-  echo "本机 MySQL/MariaDB 未在运行。建库示例："
-  echo "  sudo apt-get install -y mysql-server"
-  echo "  sudo mysql -e \"CREATE DATABASE IF NOT EXISTS geo_sys CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;\""
+  echo "本机 MySQL 未在运行，接下来的部署脚本会安装并启动它。"
 fi
 
 bash "$ROOT/deploy/remote-deploy.sh"
