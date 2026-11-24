@@ -22,28 +22,48 @@ def _demo_result(operation: str, payload: dict) -> dict:
     joined = '\n'.join(snippets) or '（未填写表单字段）'
 
     brand = str(fields.get('brand_name') or fields.get('brand') or fields.get('title') or '该品牌').strip()
-    company = str(fields.get('full_name') or brand).strip()
-    industry = str(fields.get('industry') or '未填写').strip()
-    region = str(fields.get('region') or '未填写').strip()
-    competitors = str(fields.get('competitors') or '未填写').strip()
+    company = str(fields.get('full_name') or '').strip()
+    industry = str(fields.get('industry') or '').strip()
+    region = str(fields.get('region') or '').strip()
+    competitors = str(fields.get('competitors') or '').strip()
+    platforms = str(fields.get('platforms') or '').strip()
+    need_advice = str(fields.get('need_advice') or '0') == '1'
     profile = {
-        'full_name': company if company != brand else f'{brand}（请核对工商全称）',
-        'industry': industry if industry != '未填写' else '',
-        'region': region if region != '未填写' else '服务全球',
-        'competitors': competitors if competitors != '未填写' else '',
+        'full_name': company or f'{brand}（请核对工商全称）',
+        'industry': industry,
+        'region': region or '服务全球',
+        'competitors': competitors,
     }
 
     if operation == 'detect':
-        content = (
-            '诊断任务已创建。当前账号为无限额度，本次不扣费。\n\n'
-            f'品牌：{brand}\n'
-            f'企业：{company}\n'
-            f'行业：{industry}\n'
-            f'地区：{region}\n'
-            f'竞品：{competitors}\n\n'
-            '可见度判断：公开信息中可以识别该品牌，问答覆盖和权威引用仍可以加强。\n'
-            '建议：1）统一品牌简称与企业全称 2）补充和竞品的对比问答 3）按行业和地区持续发布场景内容。'
+        lines = ['诊断任务已创建。当前账号为无限额度，本次不扣费。', '', f'品牌：{brand}']
+        if company:
+            lines.append(f'企业：{company}')
+        if industry:
+            lines.append(f'行业词：{industry}')
+        if region:
+            lines.append(f'地区：{region}')
+        if competitors:
+            lines.append(f'竞品：{competitors}')
+        if platforms:
+            lines.append(f'诊断平台：{platforms}')
+        lines.append('')
+        lines.append(
+            f'可见度判断：在已选平台的公开回答中可以识别「{brand}」'
+            + (f'与「{industry}」的关联' if industry else '')
+            + '，问答覆盖和权威引用仍可以加强。'
         )
+        if need_advice:
+            lines.extend([
+                '',
+                '优化建议：',
+                '1）把品牌全称和简称一起写进标题与问答。',
+                f'2）围绕行业词「{industry or "核心业务"}」补充对比问答和场景说明。',
+                '3）在已选平台持续发布可被引用的企业介绍、案例和参数。',
+            ])
+        else:
+            lines.extend(['', '本次仅生成可见度报告，未附带优化建议。'])
+        content = '\n'.join(lines)
     elif operation == 'analyze':
         content = (
             f'已根据「{brand}」整理全网资料。\n'

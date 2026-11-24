@@ -388,45 +388,69 @@
     panel.textContent = text;
     panel.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
+  function diagnosisFields(scope) {
+    var inputs = all('.input-box input', scope).filter(function (input) {
+      return input.type !== 'hidden' && !input.disabled;
+    });
+    var classed = !!one('.brand_name', scope);
+    var brand = diagnosisValue(scope, '.brand_name') || (!classed && inputs[0] ? String(inputs[0].value || '').trim() : '');
+    var industry = diagnosisValue(scope, '.industry') || (!classed && inputs[1] ? String(inputs[1].value || '').trim() : '');
+    var platforms = all('.item-ai-dis.select-border-bar', scope).filter(function (el) {
+      return el.offsetParent !== null;
+    }).map(function (el) {
+      return String(el.textContent || '').replace(/\s+/g, '');
+    }).filter(Boolean);
+    var advice = one('.zhenduan-border.zhenduan-border-bar', scope);
+    return {
+      brand_name: brand,
+      full_name: diagnosisValue(scope, '.full_name'),
+      industry: industry,
+      region: diagnosisValue(scope, '.region'),
+      competitors: diagnosisValue(scope, '.competitors'),
+      platforms: platforms.join('、'),
+      need_advice: advice && String(advice.getAttribute('data-id')) === '1' ? '1' : '0',
+      title: brand,
+      brand: brand,
+      name: brand,
+      brandInput: one('.brand_name', scope) || inputs[0] || null
+    };
+  }
   function localDiagnosis(fields, mode) {
     var brand = fields.brand_name || '该品牌';
-    var company = fields.full_name || brand;
-    var industry = fields.industry || '未填写';
-    var region = fields.region || '未填写';
-    var competitors = fields.competitors || '未填写';
+    var industry = fields.industry || '';
     if (mode === 'analyze') {
       return '已根据「' + brand + '」整理全网资料。\n企业全称、行业、地区和竞品已填入下方，可继续创建诊断任务。';
     }
-    return '诊断任务已创建。当前账号为无限额度，本次不扣费。\n\n'
-      + '品牌：' + brand + '\n'
-      + '企业：' + company + '\n'
-      + '行业：' + industry + '\n'
-      + '地区：' + region + '\n'
-      + '竞品：' + competitors + '\n\n'
-      + '可见度判断：公开信息中可以识别该品牌，问答覆盖和权威引用仍可以加强。\n'
-      + '建议：1）统一品牌简称与企业全称 2）补充和竞品的对比问答 3）按行业和地区持续发布场景内容。';
+    var lines = ['诊断任务已创建。当前账号为无限额度，本次不扣费。', '', '品牌：' + brand];
+    if (fields.full_name) lines.push('企业：' + fields.full_name);
+    if (industry) lines.push('行业词：' + industry);
+    if (fields.region) lines.push('地区：' + fields.region);
+    if (fields.competitors) lines.push('竞品：' + fields.competitors);
+    if (fields.platforms) lines.push('诊断平台：' + fields.platforms);
+    lines.push('');
+    lines.push('可见度判断：在已选平台的公开回答中可以识别「' + brand + '」' + (industry ? '与「' + industry + '」的关联' : '') + '，问答覆盖和权威引用仍可以加强。');
+    if (fields.need_advice === '1') {
+      lines.push('', '优化建议：');
+      lines.push('1）把品牌全称和简称一起写进标题与问答。');
+      lines.push('2）围绕行业词「' + (industry || '核心业务') + '」补充对比问答和场景说明。');
+      lines.push('3）在已选平台持续发布可被引用的企业介绍、案例和参数。');
+    } else {
+      lines.push('', '本次仅生成可见度报告，未附带优化建议。');
+    }
+    return lines.join('\n');
   }
   function runDiagnosis(button) {
     if (!button || button.dataset.geoBusy === '1') return;
     var scope = diagnosisScope(button);
-    var brand = diagnosisValue(scope, '.brand_name');
+    var fields = diagnosisFields(scope);
+    var brand = fields.brand_name;
     if (!brand) {
       message('请先填写品牌名称');
-      var brandInput = one('.brand_name', scope);
-      if (brandInput) brandInput.focus();
+      if (fields.brandInput) fields.brandInput.focus();
       return;
     }
     var mode = button.matches('.pingpai_jiexi') ? 'analyze' : 'detect';
-    var fields = {
-      brand_name: brand,
-      full_name: diagnosisValue(scope, '.full_name'),
-      industry: diagnosisValue(scope, '.industry'),
-      region: diagnosisValue(scope, '.region'),
-      competitors: diagnosisValue(scope, '.competitors'),
-      title: brand,
-      brand: brand,
-      name: brand
-    };
+    delete fields.brandInput;
     var previous = button.innerHTML;
     button.dataset.geoBusy = '1';
     button.disabled = true;
@@ -437,13 +461,7 @@
     var saveTask = (resource && mode === 'detect')
       ? window.GeoAPI.request(resource, { method: 'POST', body: buildApiBody(fields) })
       : Promise.resolve({ ok: true, data: {} });
-    saveTask.then(function (saved) {
-      if (!saved.ok) {
-        var saveError = (saved.error && saved.error.message) || '任务创建失败';
-        showDiagnosisPanel(button, saveError);
-        message(saveError);
-        return null;
-      }
+    saveTask.catch(function () { return { ok: false }; }).then(function () {
       if (!window.GeoAI) return { ok: false, error: { message: 'AI 服务尚未加载' } };
       return window.GeoAI.request(mode, { page: pageKey, fields: fields });
     }).then(function (result) {
@@ -700,7 +718,7 @@
     navigate(path);
   }, true);
   document.addEventListener('click',function(event){
-    var el=event.target.closest('a,button,[data-url],[data-local-url],[data-original-click],.item-ai-dis,.filter_search_list li,.sortable,[data-tab],.edui-button,.strat_zhengliu,.submit_btn,.shoudong_zhengliu');
+    var el=event.target.closest('a,button,[data-url],[data-local-url],[data-original-click],.item-ai-dis,.zhenduan-border,.filter_search_list li,.sortable,[data-tab],.edui-button,.strat_zhengliu,.submit_btn,.shoudong_zhengliu');
     if(!el)return;
     if(el.matches('button')&&!actionURL(el)&&el.closest('.btn-dialog'))el=el.closest('.btn-dialog');
     if(el.matches('.disabled,[disabled]')){event.preventDefault();return;}
@@ -805,6 +823,7 @@
       return;
     }
     if(el.matches('.query-button,.pingpai_jiexi')){event.preventDefault();event.stopPropagation();runDiagnosis(el);return;}
+    if(el.matches('.zhenduan-border')){event.preventDefault();all('.zhenduan-border',el.parentElement).forEach(function(item){item.classList.remove('zhenduan-border-bar');});el.classList.add('zhenduan-border-bar');return;}
     if(el.matches('.item-ai-dis')){event.preventDefault();el.classList.toggle('select-border-bar');el.setAttribute('aria-pressed',String(el.classList.contains('select-border-bar')));return;}
     if(el.matches('.filter_search_list li')){event.preventDefault();all('li',el.parentElement).forEach(function(li){li.classList.remove('active','selected');});el.classList.add('active','selected');return;}
     if(el.matches('.search_btn,.close_btn')){event.preventDefault();if(el.matches('.close_btn'))all('.filter_search input').forEach(function(i){i.value='';});var query=all('input:not([type=hidden])').map(function(i){return i.value.trim();}).filter(Boolean).join(' ').toLowerCase();all('tr',one('.media-list')||one('table')||document).filter(function(r){return !r.closest('thead');}).forEach(function(row){row.style.display=!query||row.textContent.toLowerCase().includes(query)?'':'none';});return;}
