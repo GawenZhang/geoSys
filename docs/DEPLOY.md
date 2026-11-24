@@ -188,3 +188,44 @@ AI_UPSTREAM_MODEL=gpt-4o-mini
 - AI：`demo` 可联调；`proxy` 接 OpenAI 兼容上游
 - 钱包：`/api/auth/wallet` 为演示记账（落 `user_money_log` / `user_score_log`），**不是**微信/支付宝真实支付
 - 媒体投稿/B2B 选站等仍以表单落库为主，未接第三方发布平台
+
+## 10. 推送到 GitHub 后自动部署
+
+`main` 分支每次 push 会触发 [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml)：Actions 用 SSH 登录 `ubuntu@110.40.173.15:22`，在 `~/geoSys` 执行 `git reset --hard origin/main`，再跑 [`deploy/remote-deploy.sh`](../deploy/remote-deploy.sh)（安装依赖、迁移、收集静态文件、重启 gunicorn，并重载 nginx）。
+
+密钥只放在 GitHub，不进仓库。未配置 `DEPLOY_SSH_KEY` 时，这次 workflow 会跳过，不会把流水线标红。
+
+### 服务器首次准备（SSH 登录后执行一次）
+
+```bash
+cd ~/geoSys
+git pull --ff-only origin main
+bash deploy/bootstrap.sh
+```
+
+`bootstrap.sh` 会安装 Python 虚拟环境依赖和 nginx。若还没有 `backend/.env`，会从示例生成一份（`DJANGO_DEBUG=false`，允许主机包含 `110.40.173.15`）。已有 `.env` 不会被覆盖。
+
+MySQL 需事先建好库 `geo_sys`，并把密码写进 `backend/.env` 的 `MYSQL_PASSWORD`。需要演示账号时再执行：
+
+```bash
+bash deploy/bootstrap.sh --init-demo
+```
+
+云安全组放行 **80**。站点入口：`http://110.40.173.15/` ，健康检查：`http://110.40.173.15/api/health`。gunicorn 只监听本机 `127.0.0.1:8000`。
+
+### 允许 GitHub Actions 登录这台服务器
+
+在服务器上生成一把专用密钥，公钥留在本机，私钥交给 GitHub：
+
+```bash
+ssh-keygen -t ed25519 -f ~/.ssh/geosys_deploy -N ""
+cat ~/.ssh/geosys_deploy.pub >> ~/.ssh/authorized_keys
+chmod 600 ~/.ssh/authorized_keys
+cat ~/.ssh/geosys_deploy
+```
+
+把 `cat` 打印出的整段私钥（含 `BEGIN` / `END` 行）存为仓库 Secret，名称必须是 **`DEPLOY_SSH_KEY`**：
+
+`https://github.com/GawenZhang/geoSys/settings/secrets/actions`
+
+保存后，再推一次 `main`，或在 Actions 页面手动重跑 Deploy。之后每次推送到 `main` 都会自动部署。`backend/.env`、上传的 `media/` 和虚拟环境不会被 git 覆盖。
