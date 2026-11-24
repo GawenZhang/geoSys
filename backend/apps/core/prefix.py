@@ -1,10 +1,8 @@
 """Rewrite root-relative URLs when the app is mounted under a path prefix."""
 import re
 
-# Any root-relative path except "/" itself, protocol-relative "//", and an existing prefix.
-_QUOTED = re.compile(r"""(?P<q>["'])/(?!/|geo/)(?P<rest>[^"']+)""")
-_CSS_URL = re.compile(r'url\(\s*/(?!/|geo/)')
 _HREF_ROOT = re.compile(r'(?P<attr>href|action)=(?P<q>["\'])/(?P=q)')
+_PATH = r'[A-Za-z0-9_@.+\-~/?=&:%#]+'
 _TEXT_MARKERS = (
     'text/html',
     'text/css',
@@ -15,18 +13,24 @@ _TEXT_MARKERS = (
 
 def rewrite_text(text, prefix):
     prefix = '/' + prefix.strip('/')
+    skip = re.escape(prefix.strip('/'))
+    quoted = re.compile(
+        rf"""(?P<q>["'])/(?!/|{skip}/)(?P<rest>{_PATH})(?P=q)"""
+    )
+    css_url = re.compile(rf'url\(\s*/(?!/|{skip}/)(?P<rest>{_PATH})\s*\)')
 
-    def quoted(match):
-        return f"{match.group('q')}{prefix}/{match.group('rest')}"
+    def quoted_repl(match):
+        quote = match.group('q')
+        return f"{quote}{prefix}/{match.group('rest')}{quote}"
 
-    def css(match):
-        return match.group(0).replace('/', f'{prefix}/', 1)
+    def css_repl(match):
+        return f"url({prefix}/{match.group('rest')})"
 
     def href(match):
         return f"{match.group('attr')}={match.group('q')}{prefix}/{match.group('q')}"
 
-    text = _QUOTED.sub(quoted, text)
-    text = _CSS_URL.sub(css, text)
+    text = quoted.sub(quoted_repl, text)
+    text = css_url.sub(css_repl, text)
     return _HREF_ROOT.sub(href, text)
 
 
