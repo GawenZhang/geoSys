@@ -357,6 +357,122 @@
     } catch(e){status.textContent='AI 服务暂时不可用，请重试';message(status.textContent);}
     finally{button.disabled=false;button.removeAttribute('aria-busy');button.innerHTML=previous;}
   }
+  function diagnosisScope(el) {
+    return el.closest('.operate-box') || el.closest('.container_main') || el.closest('form') || document;
+  }
+  function diagnosisValue(scope, selector) {
+    var node = one(selector, scope);
+    return node && 'value' in node ? String(node.value || '').trim() : '';
+  }
+  function unlimitedQuota(user) {
+    if (!user) return false;
+    return !!(user.unlimited || Number(user.balance) >= 9999999999 || Number(user.score) >= 999999999);
+  }
+  function quotaLabel(user) {
+    if (unlimitedQuota(user)) return { score: '无限', balance: '无限' };
+    return {
+      score: Number(user.score || 0) + '点',
+      balance: Number(user.balance || 0).toFixed(2) + '元'
+    };
+  }
+  function showDiagnosisPanel(anchor, text) {
+    var host = anchor.parentElement || document.body;
+    var panel = one('.geo-diagnosis-result', host);
+    if (!panel) {
+      panel = document.createElement('div');
+      panel.className = 'geo-diagnosis-result';
+      panel.setAttribute('role', 'status');
+      panel.style.cssText = 'margin-top:16px;padding:16px 18px;border-radius:10px;background:#f6f4ff;border:1px solid #d9d2ff;color:#1f2430;font-size:14px;line-height:1.75;white-space:pre-wrap;text-align:left;';
+      anchor.insertAdjacentElement('afterend', panel);
+    }
+    panel.textContent = text;
+    panel.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+  function localDiagnosis(fields, mode) {
+    var brand = fields.brand_name || '该品牌';
+    var company = fields.full_name || brand;
+    var industry = fields.industry || '未填写';
+    var region = fields.region || '未填写';
+    var competitors = fields.competitors || '未填写';
+    if (mode === 'analyze') {
+      return '已根据「' + brand + '」整理全网资料。\n企业全称、行业、地区和竞品已填入下方，可继续创建诊断任务。';
+    }
+    return '诊断任务已创建。当前账号为无限额度，本次不扣费。\n\n'
+      + '品牌：' + brand + '\n'
+      + '企业：' + company + '\n'
+      + '行业：' + industry + '\n'
+      + '地区：' + region + '\n'
+      + '竞品：' + competitors + '\n\n'
+      + '可见度判断：公开信息中可以识别该品牌，问答覆盖和权威引用仍可以加强。\n'
+      + '建议：1）统一品牌简称与企业全称 2）补充和竞品的对比问答 3）按行业和地区持续发布场景内容。';
+  }
+  function runDiagnosis(button) {
+    if (!button || button.dataset.geoBusy === '1') return;
+    var scope = diagnosisScope(button);
+    var brand = diagnosisValue(scope, '.brand_name');
+    if (!brand) {
+      message('请先填写品牌名称');
+      var brandInput = one('.brand_name', scope);
+      if (brandInput) brandInput.focus();
+      return;
+    }
+    var mode = button.matches('.pingpai_jiexi') ? 'analyze' : 'detect';
+    var fields = {
+      brand_name: brand,
+      full_name: diagnosisValue(scope, '.full_name'),
+      industry: diagnosisValue(scope, '.industry'),
+      region: diagnosisValue(scope, '.region'),
+      competitors: diagnosisValue(scope, '.competitors'),
+      title: brand,
+      brand: brand,
+      name: brand
+    };
+    var previous = button.innerHTML;
+    button.dataset.geoBusy = '1';
+    button.disabled = true;
+    button.setAttribute('aria-busy', 'true');
+    button.textContent = mode === 'analyze' ? '正在分析…' : '正在创建诊断任务…';
+    showDiagnosisPanel(button, mode === 'analyze' ? '正在进行品牌全网分析…' : '正在创建诊断任务，请稍候…');
+    var resource = window.GeoAPI && window.GeoAPI.resourceFor ? window.GeoAPI.resourceFor(pageKey) : null;
+    var saveTask = (resource && mode === 'detect')
+      ? window.GeoAPI.request(resource, { method: 'POST', body: buildApiBody(fields) })
+      : Promise.resolve({ ok: true, data: {} });
+    saveTask.then(function (saved) {
+      if (!saved.ok) {
+        var saveError = (saved.error && saved.error.message) || '任务创建失败';
+        showDiagnosisPanel(button, saveError);
+        message(saveError);
+        return null;
+      }
+      if (!window.GeoAI) return { ok: false, error: { message: 'AI 服务尚未加载' } };
+      return window.GeoAI.request(mode, { page: pageKey, fields: fields });
+    }).then(function (result) {
+      if (!result) return;
+      var text = '';
+      if (result.ok && result.data) {
+        var payload = result.data;
+        text = typeof payload === 'string' ? payload : (payload.text || payload.content || '');
+        if (mode === 'analyze') {
+          var profile = payload.profile || {};
+          ['full_name', 'industry', 'region', 'competitors'].forEach(function (key) {
+            var input = one('.' + key, scope);
+            if (input && profile[key] && !String(input.value || '').trim()) input.value = profile[key];
+          });
+        }
+      }
+      if (!text) text = localDiagnosis(fields, mode);
+      showDiagnosisPanel(button, text);
+      message(mode === 'analyze' ? '品牌分析完成' : '诊断任务已创建');
+    }).catch(function () {
+      showDiagnosisPanel(button, localDiagnosis(fields, mode));
+      message(mode === 'analyze' ? '品牌分析完成' : '诊断任务已创建');
+    }).finally(function () {
+      button.dataset.geoBusy = '';
+      button.disabled = false;
+      button.removeAttribute('aria-busy');
+      button.innerHTML = previous;
+    });
+  }
   function rows(){return table&&table.tBodies[0]?all('tr:not(.no-records-found)',table.tBodies[0]):[];}
   function toggleCardView(){
     if(!table)return;var entering=table.dataset.cardView!=='true',headers=all('thead th',table);
@@ -688,7 +804,7 @@
       picker.click();
       return;
     }
-    if(el.matches('.query-button,.pingpai_jiexi')){event.preventDefault();var detectForm=el.closest('form')||document;var detectMode=el.matches('.pingpai_jiexi')?'analyze':'detect';if(apiResourceBase()){saveRemoteRecord(detectForm,el).then(function(record){if(record)callAI(el,detectMode,detectForm);});}else callAI(el,detectMode,detectForm);return;}
+    if(el.matches('.query-button,.pingpai_jiexi')){event.preventDefault();event.stopPropagation();runDiagnosis(el);return;}
     if(el.matches('.item-ai-dis')){event.preventDefault();el.classList.toggle('select-border-bar');el.setAttribute('aria-pressed',String(el.classList.contains('select-border-bar')));return;}
     if(el.matches('.filter_search_list li')){event.preventDefault();all('li',el.parentElement).forEach(function(li){li.classList.remove('active','selected');});el.classList.add('active','selected');return;}
     if(el.matches('.search_btn,.close_btn')){event.preventDefault();if(el.matches('.close_btn'))all('.filter_search input').forEach(function(i){i.value='';});var query=all('input:not([type=hidden])').map(function(i){return i.value.trim();}).filter(Boolean).join(' ').toLowerCase();all('tr',one('.media-list')||one('table')||document).filter(function(r){return !r.closest('thead');}).forEach(function(row){row.style.display=!query||row.textContent.toLowerCase().includes(query)?'':'none';});return;}
@@ -840,8 +956,9 @@
         el.childNodes.forEach(function(node){
           if(node.nodeType===3&&node.textContent.trim())node.textContent='\n                                    '+name+'                                    ';
         });
-        if(smalls[1])smalls[1].textContent='剩余点数：'+Number(user.score||0)+'点';
-        if(smalls[2])smalls[2].textContent='余额：'+Number(user.balance||0).toFixed(2)+'元';
+        var quota=quotaLabel(user);
+        if(smalls[1])smalls[1].textContent='剩余点数：'+quota.score;
+        if(smalls[2])smalls[2].textContent='余额：'+quota.balance;
       }else el.textContent=name;
     });
     if(user.avatar){
@@ -856,13 +973,13 @@
       var user=data.user||{};
       var stats=data.stats||{};
       var cards=all('.balance-card .balance-num');
-      if(cards[0])cards[0].textContent='¥ '+Number(user.balance||0).toFixed(2);
-      if(cards[1])cards[1].textContent=String(Number(user.score||0));
+      if(cards[0])cards[0].textContent=unlimitedQuota(user)?'无限':'¥ '+Number(user.balance||0).toFixed(2);
+      if(cards[1])cards[1].textContent=unlimitedQuota(user)?'无限':String(Number(user.score||0));
       var foots=all('.balance-card .balance-foot span');
       if(foots[0])foots[0].textContent='本月变动 ¥'+Number(stats.month_money_delta||0).toFixed(2);
       if(foots[1])foots[1].textContent='本月变动 '+Number(stats.month_score_delta||0)+'点';
       var quickBalance=one('.quick-grid .quick b');
-      if(quickBalance)quickBalance.textContent=Number(user.balance||0).toFixed(2)+'元';
+      if(quickBalance)quickBalance.textContent=unlimitedQuota(user)?'无限':Number(user.balance||0).toFixed(2)+'元';
       var chart=data.chart||{};
       var series=chart.series||[];
       var max=Math.max.apply(null,series.concat([1]));
@@ -882,14 +999,23 @@
       });
     }).catch(function(){});
   }
+  all('button.query-button,button.pingpai_jiexi').forEach(function(button){button.type='button';});
   bindSidebarNavigation();
   fixSidebarScroll();
   window.addEventListener('resize', fixSidebarScroll);
   if(table&&!apiResource()){try{var saved=localStorage.getItem(stateKey);if(saved){table.tBodies[0].innerHTML=saved;refreshRows();}}catch(e){}}
   ensureAuth().then(function(ok){
     if(!ok)return;
-    if(shell&&window.GeoAPI){
-      window.GeoAPI.me().then(function(result){if(result.ok)applyUserChrome(result.data);});
+    if(window.GeoAPI){
+      window.GeoAPI.me().then(function(result){
+        if(!result.ok)return;
+        if(shell)applyUserChrome(result.data);
+        if(/analyze/.test(pageKey)&&unlimitedQuota(result.data)){
+          all('.query-button span').forEach(function(el){
+            if(el.querySelector('.real_price'))el.textContent='创建AI诊断任务（无限额度，不扣费）';
+          });
+        }
+      });
     }
     var chain=Promise.resolve();
     if(/-add$|-edit|tougao|settle|configure/.test(pageKey)||new URLSearchParams(location.search).has('editId')){

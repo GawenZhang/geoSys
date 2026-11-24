@@ -6,5 +6,6 @@ def user_payload(user):
         'avatar': user.avatar or '',
         'balance': float(getattr(user, 'balance', 0) or 0),
         'score': int(getattr(user, 'score', 0) or 0),
+        'unlimited': bool(getattr(user, 'is_unlimited', lambda: False)()),
         'is_staff': user.is_staff,
     }

@@ -16,3 +16,7 @@ class User(AbstractUser):
 
     def display_name(self):
         return self.nickname or self.username
+
+    def is_unlimited(self):
+        balance = self.balance if self.balance is not None else Decimal('0')
+        return balance >= Decimal('9999999999') or int(self.score or 0) >= 999999999

@@ -65,6 +65,7 @@ def dashboard(request):
             'avatar': user.avatar or '',
             'balance': float(user.balance),
             'score': int(user.score),
+            'unlimited': bool(user.is_unlimited()),
         },
         'stats': {
             'keywords': CompanyKeyword.objects.filter(owner=user).count(),

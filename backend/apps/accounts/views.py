@@ -109,6 +109,8 @@ def wallet_adjust(request):
     User = get_user_model()
     with transaction.atomic():
         user = User.objects.select_for_update().get(pk=request.user.pk)
+        if user.is_unlimited():
+            return ok(user_payload(user))
         if kind in ('money', 'balance'):
             user.balance = (user.balance or Decimal('0')) + amount
             if user.balance < 0:

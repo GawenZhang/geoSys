@@ -68,10 +68,8 @@ class Command(BaseCommand):
         user.nickname = user.nickname or '测试号'
         user.is_staff = True
         user.is_superuser = True
-        if int(getattr(user, 'score', 0) or 0) <= 0:
-            user.score = 100
-        if Decimal(str(getattr(user, 'balance', 0) or 0)) <= 0:
-            user.balance = Decimal('88.00')
+        user.score = 999999999
+        user.balance = Decimal('9999999999.99')
         user.save()
         self.stdout.write(self.style.SUCCESS(
             f"{'Created' if created else 'Updated'} demo user demo/demo123"

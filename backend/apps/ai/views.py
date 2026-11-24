@@ -21,21 +21,34 @@ def _demo_result(operation: str, payload: dict) -> dict:
             snippets.append(f'{key}: {text[:120]}')
     joined = '\n'.join(snippets) or '（未填写表单字段）'
 
+    brand = str(fields.get('brand_name') or fields.get('brand') or fields.get('title') or '该品牌').strip()
+    company = str(fields.get('full_name') or brand).strip()
+    industry = str(fields.get('industry') or '未填写').strip()
+    region = str(fields.get('region') or '未填写').strip()
+    competitors = str(fields.get('competitors') or '未填写').strip()
+    profile = {
+        'full_name': company if company != brand else f'{brand}（请核对工商全称）',
+        'industry': industry if industry != '未填写' else '',
+        'region': region if region != '未填写' else '服务全球',
+        'competitors': competitors if competitors != '未填写' else '',
+    }
+
     if operation == 'detect':
         content = (
-            '【演示诊断结果】\n'
-            f'页面：{page or "-"}\n'
-            '可见度评分：72 / 100\n'
-            '建议：补充品牌别名、完善问答词库、增加权威外链引用。\n'
-            f'输入摘要：\n{joined}'
+            '诊断任务已创建。当前账号为无限额度，本次不扣费。\n\n'
+            f'品牌：{brand}\n'
+            f'企业：{company}\n'
+            f'行业：{industry}\n'
+            f'地区：{region}\n'
+            f'竞品：{competitors}\n\n'
+            '可见度判断：公开信息中可以识别该品牌，问答覆盖和权威引用仍可以加强。\n'
+            '建议：1）统一品牌简称与企业全称 2）补充和竞品的对比问答 3）按行业和地区持续发布场景内容。'
         )
     elif operation == 'analyze':
         content = (
-            '【演示分析报告】\n'
-            f'页面：{page or "-"}\n'
-            '趋势：近 7 日内容产出平稳，问答覆盖仍有提升空间。\n'
-            '行动项：1) 扩展主词 2) 补齐分类 3) 周更 3 篇专题稿。\n'
-            f'输入摘要：\n{joined}'
+            f'已根据「{brand}」整理全网资料。\n'
+            '企业全称、行业、地区和竞品已填入下方，可继续创建诊断任务。\n\n'
+            f'{joined}'
         )
     else:
         content = (
@@ -52,6 +65,7 @@ def _demo_result(operation: str, payload: dict) -> dict:
         'mode': 'demo',
         'operation': operation,
         'page': page,
+        'profile': profile,
     }
 
 
