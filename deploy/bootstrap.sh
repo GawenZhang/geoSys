@@ -48,4 +48,4 @@ if [[ "${1:-}" == "--init-demo" ]]; then
   (cd "$ROOT/backend" && .venv/bin/python manage.py init_demo)
 fi
 
-echo "首次部署完成。浏览器打开 http://110.40.173.15/  （云安全组需放行 80 端口）"
+echo "首次部署完成。浏览器打开 http://110.40.173.15/geo/  （沿用现有网站的 80 端口，不占用网站根路径）"

@@ -191,7 +191,7 @@ AI_UPSTREAM_MODEL=gpt-4o-mini
 
 ## 10. 推送到 GitHub 后自动部署
 
-`main` 分支每次 push 会触发 [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml)：Actions 用 SSH 登录 `ubuntu@110.40.173.15:22`，在 `~/geoSys/geoSys` 执行 `git reset --hard origin/main`，再跑 [`deploy/remote-deploy.sh`](../deploy/remote-deploy.sh)（安装依赖、迁移、收集静态文件、重启 gunicorn，并重载 nginx）。
+`main` 分支每次 push 会触发 [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml)：Actions 用 SSH 登录 `ubuntu@110.40.173.15:22`，在 `~/geoSys/geoSys` 执行 `git reset --hard origin/main`，再跑 [`deploy/remote-deploy.sh`](../deploy/remote-deploy.sh)（安装依赖、迁移、收集静态文件、重启 gunicorn）。nginx 只在现有网站里增加 `/geo/`，不替换原站点，也不占用网站根路径。
 
 密钥只放在 GitHub，不进仓库。Repository secrets 里只需要 `DEPLOY_SSH_KEY`。
 
@@ -211,7 +211,7 @@ bash deploy/bootstrap.sh
 bash deploy/bootstrap.sh --init-demo
 ```
 
-云安全组放行 **80**。站点入口：`http://110.40.173.15/` ，健康检查：`http://110.40.173.15/api/health`。gunicorn 只监听本机 `127.0.0.1:8000`。
+沿用服务器上原来的 80 端口。站点入口：`http://110.40.173.15/geo/` ，健康检查：`http://110.40.173.15/geo/api/health`。gunicorn 只监听本机 `127.0.0.1:8000`。
 
 ### 允许 GitHub Actions 登录这台服务器
 

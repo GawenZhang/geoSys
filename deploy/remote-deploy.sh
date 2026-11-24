@@ -114,14 +114,7 @@ sudo -n systemctl enable geosys
 sudo -n systemctl restart geosys
 
 if command -v nginx >/dev/null 2>&1; then
-  if [[ -d /etc/nginx/sites-available ]]; then
-    sudo -n cp "$ROOT/deploy/nginx-geosys.conf" /etc/nginx/sites-available/geosys.conf
-    sudo -n ln -sfn /etc/nginx/sites-available/geosys.conf /etc/nginx/sites-enabled/geosys.conf
-    sudo -n rm -f /etc/nginx/sites-enabled/default
-  elif [[ -d /etc/nginx/conf.d ]]; then
-    sudo -n cp "$ROOT/deploy/nginx-geosys.conf" /etc/nginx/conf.d/geosys.conf
-  fi
-  sudo -n nginx -t
+  sudo -n python3 "$ROOT/deploy/install-nginx-prefix.py" "$ROOT/deploy/nginx-geosys.conf"
   sudo -n systemctl reload nginx
 fi
 
@@ -140,4 +133,9 @@ if [[ "$ready" -ne 1 ]]; then
   exit 1
 fi
 
-echo "Deploy OK: http://127.0.0.1:8000/api/health"
+if ! curl -fsS -H "Host: 110.40.173.15" "http://127.0.0.1/geo/api/health" >/dev/null; then
+  echo "gunicorn 已启动，但现有站点的 /geo 没有转发成功。" >&2
+  exit 1
+fi
+
+echo "Deploy OK: http://110.40.173.15/geo/"
