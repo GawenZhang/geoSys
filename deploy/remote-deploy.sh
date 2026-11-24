@@ -102,6 +102,7 @@ backend/.venv/bin/pip install -r backend/requirements.txt
 (
   cd backend
   .venv/bin/python manage.py migrate --noinput
+  .venv/bin/python manage.py init_demo
   .venv/bin/python manage.py collectstatic --noinput
 )
 

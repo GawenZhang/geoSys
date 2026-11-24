@@ -1,30 +1,9 @@
 """Rewrite root-relative URLs when the app is mounted under a path prefix."""
 import re
 
-_ROOTS = (
-    'admin-runtime',
-    'backend-interactions.json',
-    'backend-pages/',
-    'backend-routes.json',
-    'ai-config.js',
-    'geo-api.js',
-    'login.js',
-    'site-assets/',
-    'services/',
-    'static/',
-    'vendor/',
-    'media/',
-    'admin/',
-    'demo/',
-    'user/',
-    'api/',
-)
-_QUOTED = re.compile(
-    r"""(?P<q>["'])/(?:"""
-    + '|'.join(re.escape(root) for root in sorted(_ROOTS, key=len, reverse=True))
-    + r')'
-)
-_CSS_URL = re.compile(r'url\(\s*/(?:site-assets/|vendor/|media/|static/)')
+# Any root-relative path except "/" itself, protocol-relative "//", and an existing prefix.
+_QUOTED = re.compile(r"""(?P<q>["'])/(?!/|geo/)(?P<rest>[^"']+)""")
+_CSS_URL = re.compile(r'url\(\s*/(?!/|geo/)')
 _HREF_ROOT = re.compile(r'(?P<attr>href|action)=(?P<q>["\'])/(?P=q)')
 _TEXT_MARKERS = (
     'text/html',
@@ -38,7 +17,7 @@ def rewrite_text(text, prefix):
     prefix = '/' + prefix.strip('/')
 
     def quoted(match):
-        return f"{match.group('q')}{prefix}/{match.group(0)[2:]}"
+        return f"{match.group('q')}{prefix}/{match.group('rest')}"
 
     def css(match):
         return match.group(0).replace('/', f'{prefix}/', 1)
