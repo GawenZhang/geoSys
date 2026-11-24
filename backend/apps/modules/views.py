@@ -104,6 +104,9 @@ def module_records(request, module):
             data=payload,
         )
         obj.save()
+        if module == 'user_huaxiang':
+            from apps.pipeline.knowledge import sync_knowledge
+            sync_knowledge(obj)
         return ok(record_payload(obj), status=201)
 
     if request.method in ('PUT', 'PATCH'):
@@ -124,6 +127,9 @@ def module_records(request, module):
         if 'subtype' in body:
             obj.subtype = str(body.get('subtype') or '').strip()
         obj.save()
+        if module == 'user_huaxiang':
+            from apps.pipeline.knowledge import sync_knowledge
+            sync_knowledge(obj)
         return ok(record_payload(obj))
 
     if request.method == 'DELETE':
@@ -168,7 +174,18 @@ def module_options(request, module):
         qs = qs.filter(subtype=subtype)
     items = []
     for obj in qs.order_by('-id')[:200]:
-        items.append({'id': obj.id, 'label': obj.title or f'{module}#{obj.id}'})
+        data = obj.data or {}
+        label = obj.title or f'{module}#{obj.id}'
+        if module == 'user_site':
+            label = str(data.get('site_url') or data.get('remark') or label)
+        elif module == 'zhiling':
+            label = str(data.get('name') or label)
+        elif module == 'user_huaxiang':
+            label = str(data.get('name') or label)
+        item = {'id': obj.id, 'label': label}
+        if data.get('create_type') not in (None, ''):
+            item['create_type'] = data.get('create_type')
+        items.append(item)
     return ok({'items': items})
 
 

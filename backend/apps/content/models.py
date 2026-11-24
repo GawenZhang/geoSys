@@ -85,6 +85,11 @@ class Article(TimeStampedOwnerModel):
     image_type_id = models.IntegerField('图库分类ID', null=True, blank=True)
     content = models.TextField('正文', blank=True, default='')
     status = models.PositiveSmallIntegerField('状态', choices=STATUS_CHOICES, default=STATUS_NORMAL)
+    task_id = models.IntegerField('写作任务ID', null=True, blank=True, db_index=True)
+    question_id = models.IntegerField('问答词ID', null=True, blank=True)
+    quality_score = models.PositiveSmallIntegerField('质检分数', null=True, blank=True)
+    quality_report = models.JSONField('质检报告', default=dict, blank=True)
+    content_hash = models.CharField('正文摘要', max_length=64, blank=True, default='')
 
     class Meta:
         ordering = ['-id']

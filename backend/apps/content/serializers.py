@@ -31,6 +31,9 @@ def article_type_payload(obj):
 
 
 def article_payload(obj):
+    from apps.pipeline.quality import release_block_reason
+
+    report = obj.quality_report or {}
     return {
         'id': obj.id,
         'title': obj.title,
@@ -39,6 +42,11 @@ def article_payload(obj):
         'image_type_id': obj.image_type_id,
         'content': obj.content,
         'status': obj.status,
+        'task_id': obj.task_id,
+        'question_id': obj.question_id,
+        'quality_score': obj.quality_score,
+        'quality_report': report,
+        'quality_passed': obj.task_id is not None and release_block_reason(obj) == '',
         'created_at': obj.created_at.isoformat(),
         'updated_at': obj.updated_at.isoformat(),
     }

@@ -28,6 +28,7 @@ INSTALLED_APPS = [
     'apps.accounts',
     'apps.content',
     'apps.modules',
+    'apps.pipeline',
     'apps.ai',
     'apps.core',
 ]
@@ -136,6 +137,9 @@ AI_UPSTREAM_URL = os.getenv('AI_UPSTREAM_URL', '').strip()
 AI_UPSTREAM_KEY = os.getenv('AI_UPSTREAM_KEY', '').strip()
 AI_UPSTREAM_MODEL = os.getenv('AI_UPSTREAM_MODEL', 'gpt-4o-mini').strip()
 AI_UPSTREAM_TIMEOUT = float(os.getenv('AI_UPSTREAM_TIMEOUT', '60') or 60)
+QUALITY_PASS_SCORE = int(os.getenv('QUALITY_PASS_SCORE', '70') or 70)
+PIPELINE_INLINE_LIMIT = int(os.getenv('PIPELINE_INLINE_LIMIT', '3') or 3)
+PIPELINE_MAX_ARTICLES = 20
 
 LOGIN_URL = '/'
 X_FRAME_OPTIONS = 'SAMEORIGIN'

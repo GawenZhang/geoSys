@@ -1,4 +1,4 @@
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.views.decorators.http import require_GET, require_http_methods
 
 from apps.core.responses import fail, ok, paginate, parse_json
@@ -270,8 +270,22 @@ def articles(request):
             obj.image_type_id = _as_int(body.get('image_type_id'), allow_none=True, required=False)
         if 'content' in body:
             obj.content = _as_text(body.get('content'), required=False)
+            if obj.task_id:
+                from apps.pipeline.quality import assess_article, content_hash
+
+                score, report = assess_article(obj)
+                obj.quality_score = score
+                obj.quality_report = report
+                obj.content_hash = content_hash(obj.content)
         if 'status' in body:
-            obj.status = _as_int(body.get('status'), default=1, min_value=0, max_value=2)
+            new_status = _as_int(body.get('status'), default=1, min_value=0, max_value=2)
+            if new_status == Article.STATUS_NORMAL:
+                from apps.pipeline.quality import release_block_reason
+
+                reason = release_block_reason(obj)
+                if reason:
+                    raise ValueError(reason)
+            obj.status = new_status
 
     return _list_or_mutate(
         request,
@@ -289,8 +303,8 @@ def keyword_options(request):
     if err:
         return err
     items = [
-        {'id': item.id, 'label': item.keyword}
-        for item in _owned(CompanyKeyword, user).order_by('-id')[:200]
+        {'id': item.id, 'label': f'{item.keyword}（蒸馏问题：{item.question_count}）'}
+        for item in _owned(CompanyKeyword, user).annotate(question_count=Count('questions')).order_by('-id')[:200]
     ]
     return ok({'items': items})
 

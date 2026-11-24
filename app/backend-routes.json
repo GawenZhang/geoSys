@@ -1,4 +1,13 @@
 {
+  "/user/topic": "/backend-pages/topic.html",
+  "/user/topic/add": "/backend-pages/topic-add.html",
+  "/user/link_pool": "/backend-pages/link_pool.html",
+  "/user/link_pool/add": "/backend-pages/link_pool-add.html",
+  "/user/publish_order": "/backend-pages/publish_order.html",
+  "/user/publish_order/add": "/backend-pages/publish_order-add.html",
+  "/user/visibility": "/backend-pages/visibility.html",
+  "/user/prompt_test": "/backend-pages/prompt_test.html",
+  "/user/knowledge_import": "/backend-pages/knowledge_import.html",
   "/user/user_score_log": "/backend-pages/user_score_log.html",
   "/user/general/profile": "/backend-pages/general-profile.html",
   "/user/dashboard": "/backend-pages/dashboard.html",

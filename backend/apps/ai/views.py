@@ -63,13 +63,17 @@ def _demo_result(operation: str, payload: dict) -> dict:
             ])
         else:
             lines.extend(['', '本次仅生成可见度报告，未附带优化建议。'])
+        _append_knowledge(lines, payload.get('knowledge'))
         content = '\n'.join(lines)
     elif operation == 'analyze':
-        content = (
-            f'已根据「{brand}」整理全网资料。\n'
-            '企业全称、行业、地区和竞品已填入下方，可继续创建诊断任务。\n\n'
-            f'{joined}'
-        )
+        lines = [
+            f'已根据「{brand}」整理全网资料。',
+            '企业全称、行业、地区和竞品已填入下方，可继续创建诊断任务。',
+            '',
+            joined,
+        ]
+        _append_knowledge(lines, payload.get('knowledge'))
+        content = '\n'.join(lines)
     else:
         content = (
             '【演示生成内容】\n'
@@ -89,6 +93,36 @@ def _demo_result(operation: str, payload: dict) -> dict:
     }
 
 
+def _append_knowledge(lines: list, knowledge) -> None:
+    if not isinstance(knowledge, list) or not knowledge:
+        return
+    lines.extend(['', '知识库依据：'])
+    for item in knowledge[:4]:
+        if not isinstance(item, dict):
+            continue
+        section = str(item.get('section') or '资料')
+        text = str(item.get('text') or '').strip().replace('\n', ' ')
+        if text:
+            lines.append(f'- {section}：{text[:80]}')
+
+
+def attach_knowledge(user, payload: dict) -> dict:
+    from apps.pipeline.retrieve import retrieve
+
+    fields = payload.get('fields') if isinstance(payload.get('fields'), dict) else {}
+    query = ' '.join(
+        str(fields.get(key) or '')
+        for key in ('brand_name', 'brand', 'full_name', 'industry', 'keyword', 'title', 'name')
+    )
+    chunks = retrieve(user, query, limit=4)
+    enriched = dict(payload)
+    enriched['knowledge'] = [
+        {'section': chunk.section, 'text': chunk.text[:400]}
+        for chunk in chunks
+    ]
+    return enriched
+
+
 def _call_upstream(operation: str, payload: dict) -> dict:
     url = getattr(settings, 'AI_UPSTREAM_URL', '') or ''
     api_key = getattr(settings, 'AI_UPSTREAM_KEY', '') or ''
@@ -96,12 +130,17 @@ def _call_upstream(operation: str, payload: dict) -> dict:
     if not url:
         raise RuntimeError('未配置 AI_UPSTREAM_URL')
 
-    fields = payload.get('fields') if isinstance(payload.get('fields'), dict) else payload
-    user_prompt = json.dumps({'operation': operation, 'input': fields}, ensure_ascii=False)
-    system_prompt = (
-        '你是 geoSys 后台的内容助手。根据 operation 返回简洁中文结果：'
-        'generate=生成文案，detect=诊断，analyze=分析。直接输出可用正文。'
-    )
+    user_prompt = json.dumps({'operation': operation, 'input': payload}, ensure_ascii=False)
+    if operation in ('detect', 'analyze'):
+        system_prompt = (
+            '你是 GEO 可见度分析助手。如果输入里有 knowledge，只能依据这些企业资料判断可见度，'
+            '不要编造检索结果。用中文输出：品牌、可见度判断、知识库依据、优化建议。'
+        )
+    else:
+        system_prompt = (
+            '你是 geoSys 后台的内容助手。根据 operation 返回简洁中文结果：'
+            'generate=生成文案，detect=诊断，analyze=分析。直接输出可用正文。'
+        )
     body = {
         'model': model,
         'messages': [
@@ -165,6 +204,8 @@ def ai_proxy(request):
         return fail('validation_error', 'input 必须是对象', status=400)
 
     page = str(payload.get('page') or '')[:128]
+    if operation in ('detect', 'analyze'):
+        payload = attach_knowledge(request.user, payload)
     mode = getattr(settings, 'AI_MODE', 'stub')
 
     if mode == 'stub':

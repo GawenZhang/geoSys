@@ -42,7 +42,13 @@
     article: '/api/articles/',
     'article-add': '/api/articles/',
     article_type: '/api/article-types/',
-    'article_type-add': '/api/article-types/'
+    'article_type-add': '/api/article-types/',
+    topic: '/api/pipeline/topics/',
+    'topic-add': '/api/pipeline/topics/',
+    link_pool: '/api/pipeline/links/',
+    'link_pool-add': '/api/pipeline/links/',
+    publish_order: '/api/pipeline/orders/',
+    'publish_order-add': '/api/pipeline/orders/'
   };
 
   function csrfToken() {
