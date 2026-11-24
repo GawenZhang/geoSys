@@ -26,7 +26,7 @@ jobs:
           script_stop: true
           command_timeout: 20m
           script: |
-            cd "$HOME/geoSys"
+            cd "$HOME/geoSys/geoSys"
             git fetch origin main
             git checkout -f main
             git reset --hard origin/main
