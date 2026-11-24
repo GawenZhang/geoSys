@@ -1,5 +1,7 @@
 """Rewrite root-relative URLs when the app is mounted under a path prefix."""
+import hashlib
 import re
+from functools import lru_cache
 
 _HREF_ROOT = re.compile(r'(?P<attr>href|action)=(?P<q>["\'])/(?P=q)')
 _PATH = r'[A-Za-z0-9_@.+\-~/?=&:%#]+'
@@ -11,13 +13,19 @@ _TEXT_MARKERS = (
 )
 
 
-def rewrite_text(text, prefix):
+@lru_cache(maxsize=4)
+def _patterns(prefix):
     prefix = '/' + prefix.strip('/')
     skip = re.escape(prefix.strip('/'))
     quoted = re.compile(
         rf"""(?P<q>["'])/(?!/|{skip}/)(?P<rest>{_PATH})(?P=q)"""
     )
     css_url = re.compile(rf'url\(\s*/(?!/|{skip}/)(?P<rest>{_PATH})\s*\)')
+    return prefix, quoted, css_url
+
+
+def rewrite_text(text, prefix):
+    prefix, quoted, css_url = _patterns(prefix)
 
     def quoted_repl(match):
         quote = match.group('q')
@@ -32,6 +40,22 @@ def rewrite_text(text, prefix):
     text = quoted.sub(quoted_repl, text)
     text = css_url.sub(css_repl, text)
     return _HREF_ROOT.sub(href, text)
+
+
+_rewrite_cache = {}
+_REWRITE_CACHE_LIMIT = 64
+
+
+def _cached_rewrite(raw, prefix):
+    key = (prefix, hashlib.sha1(raw).digest())
+    found = _rewrite_cache.get(key)
+    if found is not None:
+        return found
+    rewritten = rewrite_text(raw.decode('utf-8'), prefix).encode('utf-8')
+    if len(_rewrite_cache) >= _REWRITE_CACHE_LIMIT:
+        _rewrite_cache.clear()
+    _rewrite_cache[key] = rewritten
+    return rewritten
 
 
 def _prefix(request):
@@ -83,9 +107,9 @@ class ForwardedPrefixMiddleware:
             return
         raw = b''.join(response.streaming_content) if streaming else response.content
         rewritten = raw
-        if len(raw) <= 30 * 1024 * 1024:
+        if len(raw) <= 2 * 1024 * 1024:
             try:
-                rewritten = rewrite_text(raw.decode('utf-8'), prefix).encode('utf-8')
+                rewritten = _cached_rewrite(raw, prefix)
             except UnicodeDecodeError:
                 rewritten = raw
         if streaming:

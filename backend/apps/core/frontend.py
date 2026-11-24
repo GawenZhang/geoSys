@@ -44,9 +44,19 @@ def _guess_type(path: Path) -> str:
     }.get(suffix, 'application/octet-stream')
 
 
+def _cache_control(path: Path) -> str:
+    suffix = path.suffix.lower()
+    if suffix in {'.js', '.css', '.map', '.woff', '.woff2', '.ttf', '.svg', '.png', '.jpg', '.jpeg', '.gif', '.ico'}:
+        return 'public, max-age=3600'
+    if suffix in {'.html', '.json'}:
+        return 'public, max-age=120'
+    return 'public, max-age=600'
+
+
 def _response(path: Path):
     response = FileResponse(path.open('rb'), content_type=_guess_type(path))
     response['X-Robots-Tag'] = 'noindex, nofollow'
+    response['Cache-Control'] = _cache_control(path)
     return response
 
 
