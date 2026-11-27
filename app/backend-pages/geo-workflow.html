@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>GEO 工作台</title>
+  <link rel="stylesheet" href="/admin-runtime.css">
+</head>
+<body class="geo-workflow" data-page-key="geo-workflow">
+  <main class="geo-workflow-main">
+    <header class="geo-workflow-header">
+      <h1>GEO 工作台</h1>
+      <p>用真实客户问题测出基线，补齐品牌内容，再用同一批问题复测。</p>
+      <a class="geo-button" data-geo-nav href="/user/geo-knowledge">建立知识库或导入资料</a>
+    </header>
+    <ol class="geo-steps">
+      <li class="geo-panel">
+        <h2>准备品牌资料</h2>
+        <p>导入公司介绍、产品参数、客户案例和可公开的证明材料。手头已有资料时，可以边建库边上传。</p>
+        <a data-geo-nav href="/user/geo-knowledge">建立或追加知识库</a>
+      </li>
+      <li class="geo-panel">
+        <h2>整理问题并采集基线</h2>
+        <p>先建一个核心业务关键词，再添加客户会问的完整问题。内容发布前，在目标 AI 平台用同一批问题采几轮回答。</p>
+        <div class="geo-links">
+          <a data-geo-nav href="/user/company_keyword">业务关键词</a>
+          <a data-geo-nav href="/user/company_question">客户问题</a>
+          <a data-geo-nav href="/user/geo-observations">记录基线</a>
+        </div>
+      </li>
+      <li class="geo-panel">
+        <h2>按证据写作与审核</h2>
+        <p>查看基线的回答和引用，把优先处理的问题放到本次写作的业务关键词下。选同一个关键词和知识库，先生成待审核稿，核实事实、参数和来源后再通过。</p>
+        <div class="geo-links">
+          <a data-geo-nav href="/user/ai_task">写作任务</a>
+          <a data-geo-nav href="/user/article">文章审核</a>
+          <a data-geo-nav href="/user/prompt_test">试写</a>
+        </div>
+      </li>
+      <li class="geo-panel">
+        <h2>发布并核验页面</h2>
+        <p>优先更新品牌官网。可从文章列表导出 Markdown，也可在站点任务里选站点、文章分类和篇数，立即推送到 WordPress 或 Webhook。发布后打开最终 URL，确认正文和链接能访问。</p>
+        <div class="geo-links">
+          <a data-geo-nav href="/user/user_site">配置站点</a>
+          <a data-geo-nav href="/user/user_site_task">站点任务</a>
+          <a data-geo-nav href="/user/user_site_record">推送记录</a>
+          <a data-geo-nav href="/user/link_pool">记录公开 URL</a>
+        </div>
+      </li>
+      <li class="geo-panel">
+        <h2>复测并决定下一轮</h2>
+        <p>发布后按基线的原题、平台和入口再采样，阶段选「复测」。对照提及、推荐和自有引用，逐条查看发生变化的回答。</p>
+        <div class="geo-links">
+          <a data-geo-nav href="/user/geo-observations">记录复测、查看对照</a>
+          <a data-geo-nav href="/user/visibility">站内内容和访问统计</a>
+        </div>
+      </li>
+    </ol>
+  </main>
+  <script src="/ai-config.js"></script>
+  <script src="/admin-runtime.js" defer></script>
+</body>
+</html>

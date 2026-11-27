@@ -30,20 +30,16 @@ try {
     if (html.includes('/geo-api.js')) return html;
     return html.replace('<script src="/ai-config.js"></script>', '<script src="/geo-api.js"></script><script src="/ai-config.js"></script>');
   }
-  for (const dir of ['backend-pages', 'site-assets']) await cp(resolve(source, dir), resolve(output, dir), { recursive: true });
-  for (const file of ['admin-runtime.js','admin-runtime.css','backend-routes.json','backend-page-manifest.json','backend-interactions.json']) await cp(resolve(source,file),resolve(output,file));
+  await cp(resolve(source, 'site-assets'), resolve(output, 'site-assets'), { recursive: true });
+  for (const file of ['admin-runtime.js','admin-runtime.css','geo-workflow.js','backend-routes.json','backend-page-manifest.json','backend-interactions.json']) await cp(resolve(source,file),resolve(output,file));
   const { readdir } = await import('node:fs/promises');
-  async function injectDir(dir) {
-    for (const name of await readdir(dir)) {
-      const full = resolve(dir, name);
-      if (name.endsWith('.html')) {
-        const html = await readFile(full, 'utf8');
-        const next = withGeoApi(html);
-        if (next !== html) await writeFile(full, next);
-      }
-    }
+  const sourcePages = resolve(source, 'backend-pages');
+  const outputPages = resolve(output, 'backend-pages');
+  await mkdir(outputPages, { recursive: true });
+  for (const name of await readdir(sourcePages)) {
+    const html = await readFile(resolve(sourcePages, name), 'utf8');
+    await writeFile(resolve(outputPages, name), withGeoApi(html));
   }
-  await injectDir(resolve(output, 'backend-pages'));
   const shell = withGeoApi(await readFile(resolve(source, 'shell.html'), 'utf8'));
   for (const route of ['user/index/index','user','demo']) {
     await mkdir(resolve(output,route),{recursive:true});

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>品牌知识库</title>
+  <link rel="stylesheet" href="/admin-runtime.css">
+</head>
+<body class="geo-workflow" data-page-key="geo-knowledge">
+  <main class="geo-workflow-main">
+    <header class="geo-workflow-header">
+      <a data-geo-nav href="/user/geo-workflow">返回 GEO 工作台</a>
+      <h1>品牌知识库</h1>
+      <p>已有企业资料？给知识库起名，上传文件或粘贴正文。保存后，写作任务和试写都能选用这个库。</p>
+    </header>
+    <div class="geo-workflow-columns">
+      <section class="geo-panel">
+        <h2>导入资料</h2>
+        <form id="geo-knowledge-form">
+          <label>保存到
+            <select name="record_id" aria-describedby="geo-knowledge-help">
+              <option value="">新建知识库</option>
+            </select>
+          </label>
+          <p id="geo-knowledge-help" class="geo-help">选已有知识库时，新资料会追加到原有内容里。</p>
+          <fieldset id="geo-knowledge-new" class="geo-form-grid">
+            <label>知识库名称<input name="name" required maxlength="255" placeholder="例如：企业名－产品资料"></label>
+            <label>企业名称（选填）<input name="company_name" maxlength="255"></label>
+          </fieldset>
+          <label>粘贴资料（最多 20,000 字）
+            <textarea name="text" maxlength="20000" rows="7" placeholder="可填写产品与服务、适用场景、详细参数、已获授权的案例和来源链接。"></textarea>
+          </label>
+          <label>上传文件（可与粘贴资料一起保存）
+            <input name="file" type="file" accept=".txt,.md,.markdown,.docx,.pptx,.pdf" aria-describedby="geo-file-help" data-deferred-upload>
+          </label>
+          <p id="geo-file-help" class="geo-help">每次可上传一个 1 MB 以内的 TXT、Markdown、DOCX、PPTX 或 PDF。PDF 优先用可复制文字的版本，扫描件请先转成文本。确认资料可用于公开写作。</p>
+          <button class="geo-button" type="submit">保存并导入</button>
+          <p class="geo-form-status" role="status" data-status></p>
+        </form>
+      </section>
+      <aside class="geo-panel">
+        <h2>我的知识库</h2>
+        <ul class="geo-record-list" id="geo-knowledge-list"><li>正在加载…</li></ul>
+        <div class="geo-links">
+          <a data-geo-nav href="/user/user_huaxiang">管理已有知识库</a>
+          <a data-geo-nav href="/user/company_keyword">下一步：建立业务关键词</a>
+        </div>
+      </aside>
+    </div>
+  </main>
+  <script src="/ai-config.js"></script>
+  <script src="/geo-workflow.js" defer></script>
+  <script src="/admin-runtime.js" defer></script>
+</body>
+</html>

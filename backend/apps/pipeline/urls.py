@@ -1,8 +1,10 @@
 from django.urls import path
 
-from . import studio_views, views
+from . import studio_views, views, workflow
 
 urlpatterns = [
+    path('knowledge/', workflow.knowledge, name='pipeline-knowledge'),
+    path('observations/', workflow.observations, name='pipeline-observations'),
     path('tasks/<int:task_id>/run', views.run_task, name='pipeline-run-task'),
     path('site-tasks/<int:task_id>/publish', views.publish_task, name='pipeline-publish-task'),
     path('knowledge/<int:record_id>/import', studio_views.knowledge_import, name='pipeline-knowledge-import'),

@@ -5,6 +5,7 @@ import urllib.request
 from collections import Counter
 from datetime import timedelta
 
+from django.db import transaction
 from django.utils import timezone
 
 from apps.content.models import Article, CompanyKeyword
@@ -52,15 +53,21 @@ class StudioError(Exception):
 
 
 def import_knowledge_text(record, filename: str, text: str) -> int:
+    return append_knowledge_sources(record, [(filename, text)])
+
+
+def append_knowledge_sources(record, sources) -> int:
     if record.module != 'user_huaxiang':
         raise StudioError('只能导入到企业知识库')
-    data = dict(record.data or {})
-    block = f'【{filename}】\n{text.strip()}'
-    current = str(data.get('imported') or '').strip()
-    data['imported'] = f'{current}\n\n{block}'.strip() if current else block
-    record.data = data
-    record.save(update_fields=['data', 'updated_at'])
-    return sync_knowledge(record)
+    with transaction.atomic():
+        record = BizRecord.objects.select_for_update().get(pk=record.pk)
+        data = dict(record.data or {})
+        blocks = [str(data.get('imported') or '').strip()]
+        blocks.extend(f'【{filename}】\n{text.strip()}' for filename, text in sources)
+        data['imported'] = '\n\n'.join(filter(None, blocks))
+        record.data = data
+        record.save(update_fields=['data', 'updated_at'])
+        return sync_knowledge(record)
 
 
 def test_prompt(owner, body: dict) -> dict:

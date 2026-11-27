@@ -1,4 +1,7 @@
 {
+  "/user/geo-workflow": "/backend-pages/geo-workflow.html",
+  "/user/geo-knowledge": "/backend-pages/geo-knowledge.html",
+  "/user/geo-observations": "/backend-pages/geo-observations.html",
   "/user/topic": "/backend-pages/topic.html",
   "/user/topic/add": "/backend-pages/topic-add.html",
   "/user/link_pool": "/backend-pages/link_pool.html",

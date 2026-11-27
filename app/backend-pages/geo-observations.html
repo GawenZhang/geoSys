@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>AI 回答监测</title>
+  <link rel="stylesheet" href="/admin-runtime.css">
+</head>
+<body class="geo-workflow" data-page-key="geo-observations">
+  <main class="geo-workflow-main">
+    <header class="geo-workflow-header">
+      <a data-geo-nav href="/user/geo-workflow">返回 GEO 工作台</a>
+      <h1>AI 回答监测</h1>
+      <p>在选定的平台用新会话提问，再把实际回答和引用录入这里。发布前选「基线」，发布后用相同问题、平台和入口录入「复测」。</p>
+    </header>
+    <section class="geo-panel">
+      <h2 id="geo-observation-title">记录一次采样</h2>
+      <form id="geo-observation-form">
+        <input type="hidden" name="id">
+        <div class="geo-form-grid">
+          <label>品牌<input name="brand" required maxlength="120"></label>
+          <label>品牌官网域名<input name="owned_site" maxlength="255" placeholder="例如 example.com"></label>
+          <label>平台<input name="platform" required maxlength="80" placeholder="例如 豆包"></label>
+          <label>入口和模式<input name="surface" required maxlength="80" placeholder="例如 网页端 · 联网搜索"></label>
+          <label>阶段<select name="phase"><option value="baseline">基线</option><option value="retest">复测</option></select></label>
+          <label>问题类型<select name="intent"><option value="category">品类问题（不带品牌）</option><option value="brand">品牌问题（带品牌）</option></select></label>
+          <label>采样时间<input name="observed_at" type="datetime-local"></label>
+          <label>采集结果<select name="outcome"><option value="answer">有效回答</option><option value="failed">采集失败</option></select></label>
+        </div>
+        <label>原始问题<input name="question" required maxlength="1000" placeholder="粘贴实际输入的问题，复测时沿用原文"></label>
+        <label>完整回答或失败说明<textarea name="answer" rows="6" maxlength="30000" required></textarea></label>
+        <fieldset id="geo-observation-judgments">
+          <legend>回答核对</legend>
+          <div class="geo-links">
+            <label class="geo-inline-check"><input type="checkbox" name="mentioned"> 回答提到品牌</label>
+            <label class="geo-inline-check"><input type="checkbox" name="recommended"> 回答明确推荐品牌</label>
+          </div>
+          <label>引用状态
+            <select name="citation_status">
+              <option value="unknown">无法判定</option>
+              <option value="yes">已取得引用链接</option>
+              <option value="no">确认无引用</option>
+            </select>
+          </label>
+          <label id="geo-citation-links" hidden>原始引用 URL（每行一个）
+            <textarea name="citations" rows="3" maxlength="10000"></textarea>
+          </label>
+        </fieldset>
+        <div class="geo-links">
+          <button class="geo-button" type="submit">保存采样</button>
+          <button class="geo-button geo-button-secondary" id="geo-observation-cancel" type="button" hidden>取消编辑</button>
+        </div>
+        <p class="geo-form-status" role="status" data-status></p>
+      </form>
+    </section>
+    <section class="geo-panel geo-observation-results" aria-labelledby="geo-results-title">
+      <h2 id="geo-results-title">基线与复测</h2>
+      <form id="geo-observation-filter" class="geo-links">
+        <label>按品牌筛选<input name="brand" placeholder="留空显示全部"></label>
+        <button class="geo-button geo-button-secondary" type="submit">查看结果</button>
+      </form>
+      <p class="geo-help">比例显示命中数和分母。失败不计入有效回答，无法判定的引用不计入自有引用率。</p>
+      <div id="geo-observation-summary" class="geo-table-wrap" aria-live="polite">正在加载采样…</div>
+      <h3>原始回答</h3>
+      <div id="geo-observation-list"></div>
+      <nav id="geo-observation-pages" class="geo-links" aria-label="采样记录分页"></nav>
+    </section>
+  </main>
+  <script src="/ai-config.js"></script>
+  <script src="/geo-workflow.js" defer></script>
+  <script src="/admin-runtime.js" defer></script>
+</body>
+</html>

@@ -41,6 +41,12 @@ def _split_text(text: str) -> list[str]:
     chunks = []
     buffer = ''
     for part in parts:
+        if len(part) > _CHUNK_SIZE:
+            if buffer:
+                chunks.append(buffer)
+            chunks.extend(part[start:start + _CHUNK_SIZE] for start in range(0, len(part), _CHUNK_SIZE))
+            buffer = ''
+            continue
         if buffer and len(buffer) + len(part) + 1 > _CHUNK_SIZE:
             chunks.append(buffer)
             buffer = part

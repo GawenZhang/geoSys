@@ -40,7 +40,10 @@ def _office_xml(raw: bytes, prefix: str) -> str:
         raise ValueError('文档里没有正文')
     pieces = []
     for name in sorted(names):
-        root = ElementTree.fromstring(archive.read(name))
+        try:
+            root = ElementTree.fromstring(archive.read(name))
+        except ElementTree.ParseError as exc:
+            raise ValueError('文档正文无法读取') from exc
         pieces.append(''.join(root.itertext()))
     return '\n'.join(piece.strip() for piece in pieces if piece and piece.strip())
 

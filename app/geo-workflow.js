@@ -1,0 +1,236 @@
+(function () {
+  'use strict';
+
+  const find = (selector) => document.querySelector(selector);
+  const escape = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[character]);
+  const knowledgeUrl = '/api/pipeline/knowledge/';
+  const observationsUrl = '/api/pipeline/observations/';
+  const phaseLabel = (value) => value === 'baseline' ? '基线' : '复测';
+  const intentLabel = (value) => value === 'category' ? '品类问题' : '品牌问题';
+
+  async function request(path, options) {
+    const result = await window.GeoAPI.request(path, options);
+    if (!result.ok) throw new Error(result.error?.message || '请求失败，请重试。');
+    return result.data;
+  }
+
+  function status(form, message = '', error = false) {
+    const feedback = form.querySelector('[data-status]');
+    feedback.textContent = message;
+    feedback.toggleAttribute('data-error', error);
+  }
+
+  function onSubmit(form, handler) {
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const button = form.querySelector('[type=submit]');
+      if (button.disabled) return;
+      button.disabled = true;
+      try {
+        await handler();
+      } catch (error) {
+        if (form.querySelector('[data-status]')) status(form, error.message, true);
+      } finally {
+        button.disabled = false;
+      }
+    });
+  }
+
+  function initKnowledge(form) {
+    const fields = form.elements;
+    const newRecord = find('#geo-knowledge-new');
+    const list = find('#geo-knowledge-list');
+    const updateFields = () => {
+      newRecord.hidden = newRecord.disabled = Boolean(fields.record_id.value);
+    };
+    const selectRecord = (id) => {
+      fields.record_id.value = String(id || '');
+      updateFields();
+    };
+
+    async function load(selected) {
+      try {
+        const data = await request(knowledgeUrl);
+        fields.record_id.replaceChildren(new Option('新建知识库', ''));
+        for (const { id, name } of data.items) {
+          fields.record_id.add(new Option(name, id));
+        }
+        selectRecord(selected);
+        list.innerHTML = data.items.map(({ id, name, chunks }) => '<li><button class="geo-button geo-button-secondary"'
+          + ' type="button" data-knowledge="' + id + '">追加资料</button> '
+          + escape(name) + ' · ' + chunks + ' 段</li>').join('') || '<li>还没有知识库。可直接在表单中创建。</li>';
+      } catch (error) {
+        list.textContent = '知识库列表加载失败。' + error.message;
+      }
+    }
+
+    fields.record_id.addEventListener('change', updateFields);
+    list.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-knowledge]');
+      if (!button) return;
+      selectRecord(button.dataset.knowledge);
+      fields.text.focus();
+    });
+    onSubmit(form, async () => {
+      status(form, '正在保存和提取资料…');
+      const data = new FormData(form);
+      if (!fields.file.files.length) data.delete('file');
+      const result = await request(knowledgeUrl, { method: 'POST', body: data });
+      form.reset();
+      status(form, '已保存到「' + result.name + '」，当前可检索 ' + result.chunks + ' 段。');
+      await load(result.id);
+    });
+    load();
+  }
+
+  function fraction(count, total) {
+    return total ? count + '/' + total + '（' + Math.round(100 * count / total) + '%）' : '—';
+  }
+
+  function renderSummary(element, rows) {
+    if (!rows.length) {
+      element.textContent = '暂无采样。保存第一条真实回答后，这里会显示基线或复测数据。';
+      return;
+    }
+    element.innerHTML = '<table><thead><tr><th>品牌</th><th>平台 / 入口</th><th>阶段</th><th>问题类型</th>'
+      + '<th>品牌提及</th><th>明确推荐</th><th>自有引用</th><th>采集失败</th></tr></thead><tbody>'
+      + rows.map((item) => '<tr><td>' + escape(item.brand) + '</td><td>'
+        + escape(item.platform) + ' / ' + escape(item.surface) + '</td><td>' + phaseLabel(item.phase)
+        + '</td><td>' + intentLabel(item.intent) + '</td><td>' + fraction(item.mentioned, item.valid)
+        + '</td><td>' + fraction(item.recommended, item.valid) + '</td><td>'
+        + fraction(item.own_cited, item.citation_samples) + '</td><td>' + item.failed + '</td></tr>').join('')
+      + '</tbody></table>';
+  }
+
+  function renderObservations(element, items) {
+    element.innerHTML = items.map((item) => {
+      const sources = item.citations.map((url) => '<li><a href="' + escape(url) + '" target="_blank" rel="noopener noreferrer">'
+        + escape(url) + '</a></li>').join('');
+      const retest = item.phase === 'baseline' ? '<button type="button" class="geo-button" data-retest="' + item.id + '">沿用原题复测</button>' : '';
+      const citationLabel = { yes: '已取得链接', no: '确认无引用', unknown: '无法判定' }[item.citation_status];
+      const verdict = item.outcome === 'answer' ? '<p>' + (item.mentioned ? '提到品牌' : '未提到品牌')
+        + ' · ' + (item.recommended ? '明确推荐' : '未明确推荐') + ' · ' + citationLabel + '</p>' : '';
+      return '<details class="geo-observation-record"><summary>' + escape(item.question) + ' · ' + escape(item.platform)
+        + ' · ' + phaseLabel(item.phase) + ' · ' + (item.outcome === 'failed' ? '采集失败' : '有效回答') + '</summary>'
+        + '<p class="geo-help">' + escape(item.brand) + ' · ' + escape(item.surface) + ' · ' + intentLabel(item.intent)
+        + ' · ' + escape(new Date(item.observed_at).toLocaleString('zh-CN')) + '</p>'
+        + '<p class="geo-answer">' + escape(item.answer) + '</p>' + verdict
+        + (sources ? '<ul class="geo-record-list">' + sources + '</ul>' : '')
+        + '<div class="geo-links">' + retest + '<button type="button" class="geo-button geo-button-secondary" data-edit="'
+        + item.id + '">编辑记录</button></div></details>';
+    }).join('');
+  }
+
+  function initObservations(form) {
+    const fields = form.elements;
+    const filter = find('#geo-observation-filter');
+    const summaries = find('#geo-observation-summary');
+    const list = find('#geo-observation-list');
+    const pages = find('#geo-observation-pages');
+    const judgments = find('#geo-observation-judgments');
+    const citations = find('#geo-citation-links');
+    const cancel = find('#geo-observation-cancel');
+    const submit = form.querySelector('[type=submit]');
+    let items = [];
+    let requested = 0;
+
+    function updateFields() {
+      judgments.hidden = judgments.disabled = fields.outcome.value === 'failed';
+      citations.hidden = fields.citation_status.value !== 'yes';
+      fields.citations.disabled = citations.hidden;
+      fields.citations.required = !citations.hidden;
+      fields.owned_site.required = !judgments.disabled && fields.citation_status.value !== 'unknown';
+    }
+
+    function clearSample() {
+      for (const key of ['id', 'observed_at', 'question', 'answer', 'citations']) fields[key].value = '';
+      fields.outcome.value = 'answer';
+      fields.citation_status.value = 'unknown';
+      fields.mentioned.checked = fields.recommended.checked = false;
+      find('#geo-observation-title').textContent = '记录一次采样';
+      submit.textContent = '保存采样';
+      cancel.hidden = true;
+      updateFields();
+    }
+
+    async function load(page = 1) {
+      const version = ++requested;
+      try {
+        const data = await request(observationsUrl + '?page=' + page + '&brand=' + encodeURIComponent(filter.elements.brand.value.trim()));
+        if (version !== requested) return;
+        items = data.items;
+        renderSummary(summaries, data.summary);
+        renderObservations(list, items);
+        const lastPage = Math.max(1, Math.ceil(data.total / data.page_size));
+        const link = (label, target) => '<button type="button" class="geo-button geo-button-secondary" data-page="'
+          + target + '">' + label + '</button>';
+        pages.innerHTML = (page > 1 ? link('上一页', page - 1) : '') + '<span>第 ' + page + ' / '
+          + lastPage + ' 页 · ' + data.total + ' 条</span>' + (page < lastPage ? link('下一页', page + 1) : '');
+      } catch (error) {
+        if (version !== requested) return;
+        summaries.textContent = '采样结果加载失败。' + error.message;
+        list.replaceChildren();
+        pages.replaceChildren();
+      }
+    }
+
+    fields.outcome.addEventListener('change', updateFields);
+    fields.citation_status.addEventListener('change', updateFields);
+    cancel.addEventListener('click', () => { clearSample(); status(form); });
+    onSubmit(filter, () => load());
+    pages.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-page]');
+      if (button) load(Number(button.dataset.page));
+    });
+    list.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-edit],[data-retest]');
+      if (!button) return;
+      const item = items.find((row) => row.id === Number(button.dataset.edit || button.dataset.retest));
+      if (!item) return;
+      clearSample();
+      status(form);
+      for (const key of ['brand', 'owned_site', 'platform', 'surface', 'question', 'intent']) fields[key].value = item[key];
+      fields.phase.value = button.dataset.retest ? 'retest' : item.phase;
+      if (button.dataset.edit) {
+        for (const key of ['id', 'outcome', 'answer', 'citation_status']) fields[key].value = item[key];
+        const date = new Date(item.observed_at);
+        date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+        fields.observed_at.value = date.toISOString().slice(0, 16);
+        fields.citations.value = item.citations.join('\n');
+        fields.mentioned.checked = item.mentioned;
+        fields.recommended.checked = item.recommended;
+        find('#geo-observation-title').textContent = '编辑采样';
+        submit.textContent = '保存修改';
+        cancel.hidden = false;
+      }
+      updateFields();
+      fields.answer.focus();
+    });
+    onSubmit(form, async () => {
+      const data = Object.fromEntries(new FormData(form));
+      if (data.observed_at) data.observed_at = new Date(data.observed_at).toISOString();
+      const method = data.id ? 'PUT' : 'POST';
+      if (data.outcome === 'failed') data.citation_status = 'unknown';
+      status(form, '正在保存…');
+      const result = await request(observationsUrl, { method, body: data });
+      clearSample();
+      status(form, method === 'PUT' ? '已保存修改。' : '已保存「' + phaseLabel(result.phase) + '」采样。');
+      filter.elements.brand.value = result.brand;
+      await load();
+    });
+    updateFields();
+    load();
+  }
+
+  window.GeoWorkflow = {
+    init() {
+      const knowledge = find('#geo-knowledge-form');
+      const observations = find('#geo-observation-form');
+      if (knowledge) initKnowledge(knowledge);
+      if (observations) initObservations(observations);
+    }
+  };
+}());

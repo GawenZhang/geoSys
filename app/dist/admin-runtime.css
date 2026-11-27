@@ -38,3 +38,83 @@ body[data-page-key="shell"] .main-sidebar .slimScrollRail{
   pointer-events:none !important;
 }
 @media(max-width:767px){.geo-dialog{width:96vw;height:94vh}}
+
+.geo-tools > summary { padding: 12px 16px; color: #455368; cursor: pointer; }
+.geo-tools > summary::after { content: "+"; margin-left: 9px; }
+.geo-tools[open] > summary::after { content: "−"; }
+.geo-tools .geo-legacy-menu { margin: 0 0 12px; padding-left: 8px; }
+.geo-workflow {
+  --geo-ink: #1c2837;
+  --geo-muted: #526374;
+  --geo-accent: #0c6259;
+  --geo-line: #d7e2e3;
+  margin: 0;
+  background: #f1f6f6;
+  color: var(--geo-ink);
+  font: 15px/1.65 "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+}
+.geo-workflow *, .geo-workflow *::before, .geo-workflow *::after { box-sizing: border-box; }
+.geo-workflow [hidden] { display: none !important; }
+.geo-workflow-main { max-width: 1120px; margin: auto; padding: clamp(16px, 4vw, 44px); }
+.geo-workflow-header { margin: 0 0 22px; padding-bottom: 18px; border-bottom: 1px solid var(--geo-line); }
+.geo-workflow h1 { margin: 3px 0 7px; font-size: clamp(26px, 4vw, 38px); line-height: 1.25; }
+.geo-workflow h2 { margin: 0 0 8px; font-size: 19px; line-height: 1.35; }
+.geo-workflow p { margin: 0 0 12px; }
+.geo-workflow a { color: var(--geo-accent); font-weight: 600; text-underline-offset: 3px; }
+.geo-workflow :focus-visible { outline: 2px solid #0a7769; outline-offset: 3px; }
+.geo-workflow-columns { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.geo-panel { min-width: 0; background: #fff; border: 1px solid var(--geo-line); border-radius: 10px; padding: clamp(14px, 3vw, 23px); }
+.geo-steps { display: grid; gap: 12px; margin: 0; padding-left: 28px; }
+.geo-steps > li::marker { color: var(--geo-accent); font-weight: 700; }
+.geo-links { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; }
+.geo-button, .geo-workflow a.geo-button {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 13px;
+  background: var(--geo-accent);
+  color: #fff;
+  border: 1px solid var(--geo-accent);
+  border-radius: 6px;
+  text-decoration: none;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.geo-button:hover { filter: brightness(1.14); }
+.geo-button:disabled { opacity: .6; cursor: wait; }
+.geo-button.geo-button-secondary { background: #fff; color: var(--geo-accent); }
+.geo-workflow label { display: block; margin: 8px 0; font-weight: 600; }
+.geo-workflow label :is(input, textarea, select):not([type=checkbox]) {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  margin-top: 4px;
+  padding: 8px 10px;
+  color: var(--geo-ink);
+  background: #fff;
+  border: 1px solid #9fb5b7;
+  border-radius: 5px;
+  font: inherit;
+  font-weight: 400;
+}
+.geo-workflow textarea { resize: vertical; }
+.geo-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 14px; }
+.geo-workflow fieldset { min-width: 0; margin: 0; border: 0; padding: 0; }
+.geo-workflow legend { padding: 0; font-weight: 600; }
+.geo-help { color: var(--geo-muted); font-size: 13px; }
+.geo-workflow .geo-form-status { margin: 10px 0 0; color: var(--geo-accent); }
+.geo-workflow .geo-form-status:empty { display: none; }
+.geo-workflow .geo-form-status[data-error] { color: #a42128; }
+.geo-record-list { margin: 0 0 12px; padding-left: 20px; overflow-wrap: anywhere; }
+.geo-record-list li + li { margin-top: 8px; }
+.geo-observation-results { margin-top: 16px; }
+.geo-table-wrap { overflow-x: auto; }
+.geo-workflow table { width: 100%; border-collapse: collapse; text-align: left; }
+.geo-workflow :is(th, td) { padding: 8px; border-bottom: 1px solid var(--geo-line); }
+.geo-observation-record { border-top: 1px solid var(--geo-line); padding: 10px 0; overflow-wrap: anywhere; }
+.geo-observation-record summary { cursor: pointer; font-weight: 600; }
+.geo-observation-record .geo-answer { white-space: pre-wrap; }
+#geo-observation-pages { margin-top: 10px; }
+@media (max-width: 650px) {
+  .geo-workflow-columns, .geo-form-grid { grid-template-columns: 1fr; }
+}
