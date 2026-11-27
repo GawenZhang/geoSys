@@ -11,46 +11,50 @@
   <main class="geo-workflow-main">
     <header class="geo-workflow-header">
       <h1>GEO 工作台</h1>
-      <p>用真实客户问题测出基线，补齐品牌内容，再用同一批问题复测。</p>
+      <p>用 30 天跑一个品牌、一个核心业务和两个 AI 入口。到第 30 天，用复测记录决定下一轮改什么。</p>
       <a class="geo-button" data-geo-nav href="/user/geo-knowledge">建立知识库或导入资料</a>
     </header>
     <ol class="geo-steps">
       <li class="geo-panel">
-        <h2>准备品牌资料</h2>
-        <p>导入公司介绍、产品参数、客户案例和可公开的证明材料。手头已有资料时，可以边建库边上传。</p>
-        <a data-geo-nav href="/user/geo-knowledge">建立或追加知识库</a>
-      </li>
-      <li class="geo-panel">
-        <h2>整理问题并采集基线</h2>
-        <p>先建一个核心业务关键词，再添加客户会问的完整问题。内容发布前，在目标 AI 平台用同一批问题采几轮回答。</p>
+        <span class="geo-week">第 1–5 天</span>
+        <h2>确立目标和基线</h2>
+        <p>给本轮起一个固定的试点名称。导入产品参数、适用范围和授权案例。从销售或客服记录选 16 个真问题，其中 8 个品类题做优化组，4 个相近的品类题做观察组，4 个品牌题用于核对事实。</p>
+        <p>同一条问题在两个目标入口各采 3 次，至少跨 2 天。固定地区、搜索模式和问题原文，每次使用新会话。观察组本月也采样，暂缓对这些问题做定向改页。</p>
         <div class="geo-links">
+          <a data-geo-nav href="/user/geo-knowledge">品牌知识库</a>
           <a data-geo-nav href="/user/company_keyword">业务关键词</a>
           <a data-geo-nav href="/user/company_question">客户问题</a>
           <a data-geo-nav href="/user/geo-observations">记录基线</a>
         </div>
       </li>
       <li class="geo-panel">
-        <h2>按证据写作与审核</h2>
-        <p>查看基线的回答和引用，把优先处理的问题放到本次写作的业务关键词下。选同一个关键词和知识库，先生成待审核稿，核实事实、参数和来源后再通过。</p>
+        <span class="geo-week">第 6–10 天</span>
+        <h2>看信源，更新 3–5 个重点页面</h2>
+        <p>在「同题对照和信源」查品牌缺席时被引用的页面。按业务价值、缺口能否补齐、手头证据是否充分来排序。把相近问题合到一个官网页面，优先更新已经能被搜索发现的产品页、案例页或选型指南。</p>
+        <p>开头直接答问题，再补清适用条件、真实参数、比较依据和案例出处。每项改动记下目标 URL、对应问题、修改摘要和发布日期。人工核对后发布。</p>
         <div class="geo-links">
+          <a data-geo-nav href="/user/geo-observations">查看问答与信源</a>
           <a data-geo-nav href="/user/ai_task">写作任务</a>
           <a data-geo-nav href="/user/article">文章审核</a>
-          <a data-geo-nav href="/user/prompt_test">试写</a>
+          <a data-geo-nav href="/user/user_site">配置站点</a>
+          <a data-geo-nav href="/user/user_site_task">官网推送</a>
         </div>
       </li>
       <li class="geo-panel">
-        <h2>发布并核验页面</h2>
-        <p>优先更新品牌官网。可从文章列表导出 Markdown，也可在站点任务里选站点、文章分类和篇数，立即推送到 WordPress 或 Webhook。发布后打开最终 URL，确认正文和链接能访问。</p>
+        <span class="geo-week">第 11–20 天</span>
+        <h2>核验抓取，补齐事实与外部信源</h2>
+        <p>用最终 URL 核对公开访问、正文、站内入口和 canonical。适用时用站长工具检查索引。发现 AI 引用的是旧参数时，同步更新官网与可控的外部资料。</p>
+        <p>如果同一行业目录、媒体或合作伙伴页面被反复引用，优先提供能被核实的资料，请对方更新已有条目。记录实际刊登的 URL 和日期。</p>
         <div class="geo-links">
-          <a data-geo-nav href="/user/user_site">配置站点</a>
-          <a data-geo-nav href="/user/user_site_task">站点任务</a>
           <a data-geo-nav href="/user/user_site_record">推送记录</a>
           <a data-geo-nav href="/user/link_pool">记录公开 URL</a>
         </div>
       </li>
       <li class="geo-panel">
-        <h2>复测并决定下一轮</h2>
-        <p>发布后按基线的原题、平台和入口再采样，阶段选「复测」。对照提及、推荐和自有引用，逐条查看发生变化的回答。</p>
+        <span class="geo-week">第 21–30 天</span>
+        <h2>按原题复测，判断是否出现改善</h2>
+        <p>点击「沿用原题复测」。优化组和观察组都按原入口再采 3 次，至少跨 2 天。按问题读前后样本和原始引用。</p>
+        <p>首轮目标是在至少 2 个不同的优化组品类题中，分别看到此前未观察到、且在两天重复出现的推荐或官网引用。观察组若也同步走强，先记作平台或市场共同变化。未看到稳定变化时，根据索引状态、引用来源和回答内容决定下一轮改动。</p>
         <div class="geo-links">
           <a data-geo-nav href="/user/geo-observations">记录复测、查看对照</a>
           <a data-geo-nav href="/user/visibility">站内内容和访问统计</a>

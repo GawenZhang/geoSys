@@ -1,6 +1,4 @@
 """Knowledge intake and manually observed AI answers for the GEO workflow."""
-from urllib.parse import urlsplit
-
 from django import forms
 from django.core.validators import URLValidator
 from django.db import transaction
@@ -12,6 +10,7 @@ from apps.core.responses import fail, ok, paginate
 from apps.modules.models import BizRecord
 
 from .documents import MAX_BYTES, MAX_CHARS, extract_upload
+from .measurement import hostname, is_owned, matched_questions
 from .studio import append_knowledge_sources
 from .studio_views import _body, _user_or_401
 
@@ -28,11 +27,15 @@ class KnowledgeForm(forms.Form):
 
 class ObservationForm(forms.Form):
     id = forms.IntegerField(required=False, min_value=1)
+    trial = forms.CharField(required=False, max_length=120, label='试点名称')
     brand = forms.CharField(max_length=120, label='品牌')
     platform = forms.CharField(max_length=80, label='平台')
     surface = forms.CharField(max_length=80, label='入口和模式')
     phase = forms.ChoiceField(choices=[('baseline', '基线'), ('retest', '复测')], label='阶段')
     intent = forms.ChoiceField(choices=[('category', '品类问题'), ('brand', '品牌问题')], label='问题类型')
+    cohort = forms.ChoiceField(
+        required=False, choices=[('target', '优化组'), ('holdout', '观察组')], label='试点分组',
+    )
     question = forms.CharField(max_length=1000, label='原始问题')
     observed_at = forms.DateTimeField(required=False, label='采样时间')
     outcome = forms.ChoiceField(choices=[('answer', '有效回答'), ('failed', '采集失败')], label='采集结果')
@@ -48,6 +51,9 @@ class ObservationForm(forms.Form):
     def clean(self):
         values = super().clean()
         if self.errors:
+            return values
+        if values['cohort'] and not values['trial']:
+            self.add_error('trial', '设置试点分组时，请填写试点名称。')
             return values
         values['observed_at'] = (values['observed_at'] or timezone.now()).isoformat()
         if not values['answer']:
@@ -71,7 +77,7 @@ class ObservationForm(forms.Form):
                 break
             try:
                 validate_url(url)
-                hosts.append(_hostname(url))
+                hosts.append(hostname(url))
             except forms.ValidationError:
                 self.add_error('citations', '引用网址格式不正确。')
                 break
@@ -80,19 +86,14 @@ class ObservationForm(forms.Form):
             try:
                 url = domain if '://' in domain else f'https://{domain}'
                 validate_url(url)
-                domain = _hostname(url)
+                domain = hostname(url)
             except forms.ValidationError:
                 self.add_error('owned_site', '引用状态可判定时，请填写有效的品牌官网域名。')
         values['owned_site'] = domain
         values['citations'] = urls
-        values['own_cited'] = any(host == domain or host.endswith('.' + domain) for host in hosts) if domain else False
+        values['own_cited'] = any(is_owned(host, domain) for host in hosts)
         values['mentioned'] = values['mentioned'] or values['recommended']
         return values
-
-
-def _hostname(value):
-    host = (urlsplit(value).hostname or '').lower().rstrip('.')
-    return host.removeprefix('www.')
 
 
 def _invalid_form(form):
@@ -141,7 +142,7 @@ def knowledge(request):
 
 
 def _observation_payload(record):
-    return {'id': record.id, **record.data}
+    return {'id': record.id, 'trial': '', 'cohort': '', **record.data}
 
 
 def _observation_summary(records):
@@ -173,8 +174,11 @@ def observations(request):
     if request.method == 'GET':
         if brand := request.GET.get('brand', '').strip():
             records = records.filter(data__brand__iexact=brand)
+        if trial := request.GET.get('trial', '').strip():
+            records = records.filter(data__trial__exact=trial)
         data = paginate(records, request, _observation_payload)
         data['summary'] = _observation_summary(records)
+        data['questions'] = matched_questions(records)
         return ok(data)
     body, error = _body(request)
     if error:

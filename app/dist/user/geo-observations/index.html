@@ -12,17 +12,25 @@
     <header class="geo-workflow-header">
       <a data-geo-nav href="/user/geo-workflow">返回 GEO 工作台</a>
       <h1>AI 回答监测</h1>
-      <p>在选定的平台用新会话提问，再把实际回答和引用录入这里。发布前选「基线」，发布后用相同问题、平台和入口录入「复测」。</p>
+      <p>在选定的平台用新会话提问，再录入回答和引用。同一试点沿用品牌、分组、问题原文和入口设置。</p>
     </header>
     <section class="geo-panel">
       <h2 id="geo-observation-title">记录一次采样</h2>
       <form id="geo-observation-form">
         <input type="hidden" name="id">
         <div class="geo-form-grid">
+          <label>试点名称<input name="trial" maxlength="120" placeholder="例如：工业水泵首轮"></label>
+          <label>试点分组
+            <select name="cohort">
+              <option value="">不分组</option>
+              <option value="target">优化组（本轮定向改页）</option>
+              <option value="holdout">观察组（本轮暂缓定向改页）</option>
+            </select>
+          </label>
           <label>品牌<input name="brand" required maxlength="120"></label>
           <label>品牌官网域名<input name="owned_site" maxlength="255" placeholder="例如 example.com"></label>
           <label>平台<input name="platform" required maxlength="80" placeholder="例如 豆包"></label>
-          <label>入口和模式<input name="surface" required maxlength="80" placeholder="例如 网页端 · 联网搜索"></label>
+          <label>入口、地区和模式<input name="surface" required maxlength="80" placeholder="例如 网页端 · 中国大陆 · 联网搜索"></label>
           <label>阶段<select name="phase"><option value="baseline">基线</option><option value="retest">复测</option></select></label>
           <label>问题类型<select name="intent"><option value="category">品类问题（不带品牌）</option><option value="brand">品牌问题（带品牌）</option></select></label>
           <label>采样时间<input name="observed_at" type="datetime-local"></label>
@@ -58,10 +66,15 @@
       <h2 id="geo-results-title">基线与复测</h2>
       <form id="geo-observation-filter" class="geo-links">
         <label>按品牌筛选<input name="brand" placeholder="留空显示全部"></label>
+        <label>试点名称<input name="trial" placeholder="填写试点名称筛选"></label>
         <button class="geo-button geo-button-secondary" type="submit">查看结果</button>
       </form>
+      <h3>总体采样</h3>
       <p class="geo-help">比例显示命中数和分母。失败不计入有效回答，无法判定的引用不计入自有引用率。</p>
       <div id="geo-observation-summary" class="geo-table-wrap" aria-live="polite">正在加载采样…</div>
+      <h3>同题对照和信源</h3>
+      <p class="geo-help">同一试点、平台、入口和问题才放在同一行。试点品类题需在两个阶段分别有至少 3 条有效样本、跨至少 2 天，才检查是否出现重复的新推荐或官网引用。</p>
+      <div id="geo-question-comparison" class="geo-table-wrap" aria-live="polite"></div>
       <h3>原始回答</h3>
       <div id="geo-observation-list"></div>
       <nav id="geo-observation-pages" class="geo-links" aria-label="采样记录分页"></nav>

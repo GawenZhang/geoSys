@@ -9,6 +9,7 @@
   const observationsUrl = '/api/pipeline/observations/';
   const phaseLabel = (value) => value === 'baseline' ? '基线' : '复测';
   const intentLabel = (value) => value === 'category' ? '品类问题' : '品牌问题';
+  const cohortLabel = (value) => ({ target: '优化组', holdout: '观察组' })[value] || '未分组';
 
   async function request(path, options) {
     const result = await window.GeoAPI.request(path, options);
@@ -105,6 +106,33 @@
       + '</tbody></table>';
   }
 
+  function renderComparison(element, rows) {
+    if (!rows.length) {
+      element.textContent = '录入有效回答后，可在这里看逐题对照。';
+      return;
+    }
+    const metrics = (sample) => sample.valid
+      ? sample.valid + ' 条 · ' + sample.dates + ' 天<br>提及 ' + fraction(sample.mentioned, sample.valid)
+        + '<br>推荐 ' + fraction(sample.recommended, sample.valid)
+        + '<br>官网引用 ' + fraction(sample.own_cited, sample.citation_samples)
+      : '待采样';
+    element.innerHTML = '<table class="geo-comparison"><thead><tr><th>问题 / 入口</th><th>基线</th><th>复测</th>'
+      + '<th>信源与变化</th></tr></thead><tbody>'
+      + rows.map((row) => {
+        const sources = row.sources.length ? '<details><summary>品牌缺席时的基线信源</summary><ul>'
+          + row.sources.map(({ url, answers }) => '<li><a href="' + escape(url)
+            + '" target="_blank" rel="noopener noreferrer">' + escape(url) + '</a> · ' + answers + ' 条回答</li>').join('')
+          + '</ul></details>' : '';
+        const signals = row.signals.map((signal) => signal === 'recommendation' ? '跨日新增推荐' : '跨日新增官网引用');
+        return '<tr><th scope="row">' + escape(row.question) + '<br><span class="geo-help">'
+          + escape([row.trial, row.brand, row.platform, row.surface].filter(Boolean).join(' · ')) + '<br>'
+          + intentLabel(row.intent) + ' · ' + cohortLabel(row.cohort) + '</span></th><td>' + metrics(row.baseline)
+          + '</td><td>' + metrics(row.retest) + '</td><td>'
+          + (signals.length ? '<strong>' + signals.join(' · ') + '</strong>' : '')
+          + (sources || (signals.length ? '' : '—')) + '</td></tr>';
+      }).join('') + '</tbody></table>';
+  }
+
   function renderObservations(element, items) {
     element.innerHTML = items.map((item) => {
       const sources = item.citations.map((url) => '<li><a href="' + escape(url) + '" target="_blank" rel="noopener noreferrer">'
@@ -115,7 +143,8 @@
         + ' · ' + (item.recommended ? '明确推荐' : '未明确推荐') + ' · ' + citationLabel + '</p>' : '';
       return '<details class="geo-observation-record"><summary>' + escape(item.question) + ' · ' + escape(item.platform)
         + ' · ' + phaseLabel(item.phase) + ' · ' + (item.outcome === 'failed' ? '采集失败' : '有效回答') + '</summary>'
-        + '<p class="geo-help">' + escape(item.brand) + ' · ' + escape(item.surface) + ' · ' + intentLabel(item.intent)
+        + '<p class="geo-help">' + escape([item.trial, item.brand, item.surface].filter(Boolean).join(' · '))
+        + ' · ' + intentLabel(item.intent) + ' · ' + cohortLabel(item.cohort)
         + ' · ' + escape(new Date(item.observed_at).toLocaleString('zh-CN')) + '</p>'
         + '<p class="geo-answer">' + escape(item.answer) + '</p>' + verdict
         + (sources ? '<ul class="geo-record-list">' + sources + '</ul>' : '')
@@ -128,6 +157,7 @@
     const fields = form.elements;
     const filter = find('#geo-observation-filter');
     const summaries = find('#geo-observation-summary');
+    const comparison = find('#geo-question-comparison');
     const list = find('#geo-observation-list');
     const pages = find('#geo-observation-pages');
     const judgments = find('#geo-observation-judgments');
@@ -143,6 +173,7 @@
       fields.citations.disabled = citations.hidden;
       fields.citations.required = !citations.hidden;
       fields.owned_site.required = !judgments.disabled && fields.citation_status.value !== 'unknown';
+      fields.trial.required = Boolean(fields.cohort.value);
     }
 
     function clearSample() {
@@ -159,10 +190,13 @@
     async function load(page = 1) {
       const version = ++requested;
       try {
-        const data = await request(observationsUrl + '?page=' + page + '&brand=' + encodeURIComponent(filter.elements.brand.value.trim()));
+        const query = new URLSearchParams(new FormData(filter));
+        query.set('page', page);
+        const data = await request(observationsUrl + '?' + query);
         if (version !== requested) return;
         items = data.items;
         renderSummary(summaries, data.summary);
+        renderComparison(comparison, data.questions || []);
         renderObservations(list, items);
         const lastPage = Math.max(1, Math.ceil(data.total / data.page_size));
         const link = (label, target) => '<button type="button" class="geo-button geo-button-secondary" data-page="'
@@ -172,6 +206,7 @@
       } catch (error) {
         if (version !== requested) return;
         summaries.textContent = '采样结果加载失败。' + error.message;
+        comparison.replaceChildren();
         list.replaceChildren();
         pages.replaceChildren();
       }
@@ -179,6 +214,7 @@
 
     fields.outcome.addEventListener('change', updateFields);
     fields.citation_status.addEventListener('change', updateFields);
+    fields.cohort.addEventListener('change', updateFields);
     cancel.addEventListener('click', () => { clearSample(); status(form); });
     onSubmit(filter, () => load());
     pages.addEventListener('click', (event) => {
@@ -192,7 +228,9 @@
       if (!item) return;
       clearSample();
       status(form);
-      for (const key of ['brand', 'owned_site', 'platform', 'surface', 'question', 'intent']) fields[key].value = item[key];
+      for (const key of ['trial', 'cohort', 'brand', 'owned_site', 'platform', 'surface', 'question', 'intent']) {
+        fields[key].value = item[key] || '';
+      }
       fields.phase.value = button.dataset.retest ? 'retest' : item.phase;
       if (button.dataset.edit) {
         for (const key of ['id', 'outcome', 'answer', 'citation_status']) fields[key].value = item[key];
@@ -219,6 +257,7 @@
       clearSample();
       status(form, method === 'PUT' ? '已保存修改。' : '已保存「' + phaseLabel(result.phase) + '」采样。');
       filter.elements.brand.value = result.brand;
+      filter.elements.trial.value = result.trial || '';
       await load();
     });
     updateFields();

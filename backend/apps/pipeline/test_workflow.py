@@ -70,6 +70,55 @@ class WorkflowTests(TestCase):
                                     content_type='application/json')
         self.assertEqual(response.status_code, 400)
 
+    def test_trial_report_matches_original_questions_and_counts_repeat_signals(self):
+        url = '/api/pipeline/observations/'
+        trial = {'trial': '水泵首轮', 'cohort': 'target'}
+        baseline = dict(trial, phase='baseline', recommended=False,
+                        citations='https://journal.example.net/selection')
+        for day in (1, 2, 3):
+            response = self.client.post(url, self._observation(
+                **baseline, observed_at=f'2026-11-{day:02}T09:00:00+08:00',
+            ), content_type='application/json')
+            self.assertEqual(response.status_code, 201, response.content)
+
+        retest = dict(trial, phase='retest', recommended=True, citations='https://example.com/selection')
+        for day, hour in ((21, 9), (21, 11), (23, 9)):
+            response = self.client.post(url, self._observation(
+                **retest, observed_at=f'2026-11-{day:02}T{hour:02}:00:00+08:00',
+            ), content_type='application/json')
+            self.assertEqual(response.status_code, 201, response.content)
+
+        for extra in ({'surface': 'App · 搜索'}, {'question': '果园用什么泵？'}, {'cohort': 'holdout'},
+                      {'trial': '水泵第二轮'}):
+            response = self.client.post(url, self._observation(**{**retest, **extra}), content_type='application/json')
+            self.assertEqual(response.status_code, 201, response.content)
+
+        rows = self.client.get(url, {'trial': '水泵首轮'}).json()['data']['questions']
+        paired = [row for row in rows if row['baseline']['valid']]
+        self.assertEqual(len(rows), 4)
+        self.assertEqual(len(paired), 1)
+        self.assertEqual(paired[0]['signals'], ['recommendation', 'citation'])
+        self.assertEqual(paired[0]['sources'], [{'url': 'https://journal.example.net/selection', 'answers': 3}])
+        self.assertEqual(paired[0]['retest']['valid'], 3)
+        self.assertEqual(paired[0]['retest']['dates'], 2)
+
+    def test_same_day_hits_do_not_count_as_repeat_signals(self):
+        url = '/api/pipeline/observations/'
+        for phase, day, hour, hit in (
+            ('baseline', 1, 9, False), ('baseline', 2, 9, False), ('baseline', 3, 9, False),
+            ('retest', 21, 9, True), ('retest', 21, 11, True), ('retest', 23, 9, False),
+        ):
+            response = self.client.post(url, self._observation(
+                trial='水泵首轮', cohort='target', phase=phase, recommended=hit,
+                observed_at=f'2026-11-{day:02}T{hour:02}:00:00+08:00',
+                citations='https://example.com/selection' if hit else 'https://journal.example.net/selection',
+            ), content_type='application/json')
+            self.assertEqual(response.status_code, 201, response.content)
+        row, = self.client.get(url).json()['data']['questions']
+        self.assertEqual(row['retest']['recommended'], 2)
+        self.assertEqual(row['retest']['own_cited'], 2)
+        self.assertEqual(row['signals'], [])
+
     def test_account_cannot_read_or_update_another_accounts_workflow(self):
         knowledge = self.client.post('/api/pipeline/knowledge/', {'name': '私有库', 'text': '原有资料'})
         observation = self.client.post('/api/pipeline/observations/', self._observation(), content_type='application/json')

@@ -111,6 +111,13 @@ body[data-page-key="shell"] .main-sidebar .slimScrollRail{
 .geo-table-wrap { overflow-x: auto; }
 .geo-workflow table { width: 100%; border-collapse: collapse; text-align: left; }
 .geo-workflow :is(th, td) { padding: 8px; border-bottom: 1px solid var(--geo-line); }
+.geo-comparison { min-width: 680px; table-layout: fixed; }
+.geo-comparison :is(th, td) { vertical-align: top; overflow-wrap: anywhere; }
+.geo-comparison th:first-child, .geo-comparison th:last-child { width: 32%; }
+.geo-comparison strong { color: var(--geo-accent); }
+.geo-comparison details { margin-top: 6px; }
+.geo-comparison summary { cursor: pointer; }
+.geo-week { display: block; margin-bottom: 4px; color: var(--geo-accent); font-size: 13px; font-weight: 600; }
 .geo-observation-record { border-top: 1px solid var(--geo-line); padding: 10px 0; overflow-wrap: anywhere; }
 .geo-observation-record summary { cursor: pointer; font-weight: 600; }
 .geo-observation-record .geo-answer { white-space: pre-wrap; }
