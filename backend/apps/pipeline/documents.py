@@ -4,16 +4,19 @@ import re
 import zipfile
 from xml.etree import ElementTree
 
-MAX_BYTES = 1_000_000
+# Keep multipart requests below the 20 MiB reverse-proxy limit.
+MAX_UPLOAD_MB = 20
+MAX_BYTES = MAX_UPLOAD_MB * 1_000_000
 MAX_CHARS = 20000
 
 
-def extract_upload(name: str, raw: bytes) -> str:
+def extract_upload(upload) -> str:
+    if upload.size > MAX_BYTES:
+        raise ValueError(f'文件超过 {MAX_UPLOAD_MB} MB，请压缩或拆分后再上传。')
+    raw = upload.read()
     if not raw:
         raise ValueError('文件是空的')
-    if len(raw) > MAX_BYTES:
-        raise ValueError('文件超过 1MB')
-    ext = (name or '').rsplit('.', 1)[-1].lower()
+    ext = upload.name.rsplit('.', 1)[-1].lower()
     if ext in ('txt', 'md', 'markdown'):
         text = raw.decode('utf-8', errors='replace')
     elif ext == 'docx':

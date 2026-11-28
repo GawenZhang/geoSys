@@ -6,7 +6,7 @@ from apps.content.models import Article
 from apps.core.responses import fail, ok, paginate, parse_json
 from apps.modules.models import BizRecord
 
-from .documents import MAX_BYTES, extract_upload
+from .documents import extract_upload
 from .models import LinkItem, PublishOrder, Topic
 from .studio import (
     StudioError,
@@ -68,7 +68,7 @@ def knowledge_import(request, record_id: int):
     if not upload:
         return fail('validation_error', '请选择文件', status=400)
     try:
-        text = extract_upload(upload.name, upload.read(MAX_BYTES + 1))
+        text = extract_upload(upload)
         count = import_knowledge_text(record, upload.name, text)
     except ValueError as exc:
         return fail('validation_error', str(exc), status=400)

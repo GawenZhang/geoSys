@@ -1,3 +1,6 @@
+from io import BytesIO
+from zipfile import ZipFile
+
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
@@ -36,6 +39,37 @@ class WorkflowTests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertFalse(BizRecord.objects.filter(owner=self.user, module='user_huaxiang').exists())
         self.assertFalse(KnowledgeChunk.objects.filter(owner=self.user).exists())
+
+    def test_document_above_old_limit_imports_in_both_knowledge_entries(self):
+        content = BytesIO()
+        with ZipFile(content, 'w') as archive:
+            archive.writestr('word/document.xml', '<document><p>设备支持远程调速。</p></document>')
+            archive.writestr('word/media/attachment.bin', b'\x01' * 1_200_000)
+
+        response = self.client.post('/api/pipeline/knowledge/', {
+            'name': '大文件资料',
+            'file': SimpleUploadedFile('设备手册.docx', content.getvalue()),
+        })
+        self.assertEqual(response.status_code, 201, response.content)
+        record_id = response.json()['data']['id']
+        response = self.client.post(f'/api/pipeline/knowledge/{record_id}/import', {
+            'file': SimpleUploadedFile('设备补充.docx', content.getvalue()),
+        })
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertTrue(KnowledgeChunk.objects.filter(source_id=record_id, text__contains='远程调速').exists())
+
+    def test_knowledge_upload_accepts_20_mb_and_rejects_larger_files(self):
+        url = '/api/pipeline/knowledge/'
+        for size, expected in ((20_000_000, 201), (20_000_001, 400)):
+            with self.subTest(size=size):
+                response = self.client.post(url, {
+                    'name': f'测试边界 {size}',
+                    'text': '同时保存粘贴资料',
+                    'file': SimpleUploadedFile('details.txt', b'Equipment details'.ljust(size)),
+                })
+                self.assertEqual(response.status_code, expected, response.content)
+                if expected == 400:
+                    self.assertIn('文件超过 20 MB', response.json()['error']['message'])
 
     def _observation(self, **changes):
         return {

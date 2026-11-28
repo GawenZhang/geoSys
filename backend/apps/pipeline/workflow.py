@@ -9,7 +9,7 @@ from django.views.decorators.http import require_http_methods
 from apps.core.responses import fail, ok, paginate
 from apps.modules.models import BizRecord
 
-from .documents import MAX_BYTES, MAX_CHARS, extract_upload
+from .documents import MAX_CHARS, extract_upload
 from .measurement import hostname, is_owned, matched_questions
 from .studio import append_knowledge_sources
 from .studio_views import _body, _user_or_401
@@ -123,7 +123,7 @@ def knowledge(request):
         sources.append(('粘贴资料', data['text']))
     if upload := data['file']:
         try:
-            sources.append((upload.name, extract_upload(upload.name, upload.read(MAX_BYTES + 1))))
+            sources.append((upload.name, extract_upload(upload)))
         except ValueError as exc:
             return fail('validation_error', str(exc))
     if not sources:
