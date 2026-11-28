@@ -44,6 +44,7 @@
     const fields = form.elements;
     const newRecord = find('#geo-knowledge-new');
     const list = find('#geo-knowledge-list');
+    const extractKeywords = initKeywordExtraction();
     const updateFields = () => {
       newRecord.hidden = newRecord.disabled = Boolean(fields.record_id.value);
     };
@@ -60,9 +61,11 @@
           fields.record_id.add(new Option(name, id));
         }
         selectRecord(selected);
-        list.innerHTML = data.items.map(({ id, name, chunks }) => '<li><button class="geo-button geo-button-secondary"'
-          + ' type="button" data-knowledge="' + id + '">追加资料</button> '
-          + escape(name) + ' · ' + chunks + ' 段</li>').join('') || '<li>还没有知识库。可直接在表单中创建。</li>';
+        list.innerHTML = data.items.map(({ id, name, chunks }) => '<li><strong>' + escape(name) + '</strong> · '
+          + chunks + ' 段<div class="geo-links geo-knowledge-actions">'
+          + '<button class="geo-button geo-button-secondary" type="button" data-knowledge="' + id + '">追加资料</button>'
+          + '<button class="geo-button geo-button-secondary" type="button" data-extract="' + id + '" data-name="'
+          + escape(name) + '">提取关键词</button></div></li>').join('') || '<li>还没有知识库。可直接在表单中创建。</li>';
       } catch (error) {
         list.textContent = '知识库列表加载失败。' + error.message;
       }
@@ -70,6 +73,11 @@
 
     fields.record_id.addEventListener('change', updateFields);
     list.addEventListener('click', (event) => {
+      const extract = event.target.closest('[data-extract]');
+      if (extract) {
+        extractKeywords(extract.dataset.extract, extract.dataset.name);
+        return;
+      }
       const button = event.target.closest('[data-knowledge]');
       if (!button) return;
       selectRecord(button.dataset.knowledge);
@@ -85,6 +93,70 @@
       await load(result.id);
     });
     load();
+  }
+
+  function initKeywordExtraction() {
+    const panel = find('#geo-keyword-panel');
+    const heading = find('#geo-keyword-heading');
+    const form = find('#geo-keyword-form');
+    const candidates = find('#geo-keyword-candidates');
+    const actions = find('#geo-keyword-actions');
+    const submit = form.querySelector('[type=submit]');
+    let selectedUrl = '';
+    let revision = 0;
+
+    onSubmit(form, async () => {
+      const selected = Array.from(candidates.querySelectorAll('.geo-keyword-list-item'))
+        .filter((row) => row.querySelector('[type=checkbox]').checked);
+      if (!selected.length) throw new Error('请先勾选要保存的业务关键词。');
+      const keywords = selected.map((row) => row.querySelector('[type=text]').value.trim());
+      status(form, '正在保存业务关键词…');
+      const saved = await request(selectedUrl, { method: 'PUT', body: { keywords } });
+      selected.forEach((row) => {
+        const checkbox = row.querySelector('[type=checkbox]');
+        checkbox.checked = false;
+        checkbox.disabled = true;
+        row.querySelector('[type=text]').disabled = true;
+        row.querySelector('[data-keyword-state]').textContent = '已在业务关键词列表';
+      });
+      status(form, '已保存 ' + saved.created + ' 个业务关键词，已有同名词 ' + saved.skipped + ' 个。');
+    });
+
+    return async (id, name) => {
+      if (submit.disabled) return;
+      const version = ++revision;
+      selectedUrl = knowledgeUrl + id + '/' + 'keywords';
+      heading.textContent = '从「' + name + '」提取业务关键词';
+      panel.hidden = false;
+      actions.hidden = true;
+      candidates.replaceChildren();
+      status(form, '正在提取候选词…');
+      heading.focus();
+      try {
+        const data = await request(selectedUrl, { method: 'POST', body: {} });
+        if (version !== revision) return;
+        if (!data.items.length) {
+          status(form, '没找到明确的业务词。先追加具体产品或服务，例如「主营业务：工业水泵、变频控制柜」，再提取一次。');
+          return;
+        }
+        candidates.innerHTML = data.items.map((item, index) => {
+          const disabled = item.existing ? ' disabled' : '';
+          const id = 'geo-candidate-' + index;
+          return '<div class="geo-keyword-list-item"><div><label for="' + id + '">'
+            + '<input type="checkbox" id="' + id + '" aria-label="选中候选词 ' + escape(item.keyword)
+            + '"' + disabled + '> 保存这个词</label>'
+            + '<input type="text" class="geo-keyword-input" maxlength="32" aria-label="编辑业务关键词 '
+            + escape(item.keyword) + '" value="' + escape(item.keyword) + '"' + disabled + '></div>'
+            + '<p class="geo-help">资料原文 · ' + escape(item.evidence)
+            + '<br><span data-keyword-state>' + (item.existing ? '已在业务关键词列表' : '')
+            + '</span></p></div>';
+        }).join('');
+        actions.hidden = false;
+        status(form, '提取到 ' + data.items.length + ' 个候选词。');
+      } catch (error) {
+        if (version === revision) status(form, error.message, true);
+      }
+    };
   }
 
   function fraction(count, total) {

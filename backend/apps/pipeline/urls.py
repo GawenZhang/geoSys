@@ -4,6 +4,7 @@ from . import studio_views, views, workflow
 
 urlpatterns = [
     path('knowledge/', workflow.knowledge, name='pipeline-knowledge'),
+    path('knowledge/<int:record_id>/keywords', workflow.knowledge_keywords, name='pipeline-knowledge-keywords'),
     path('observations/', workflow.observations, name='pipeline-observations'),
     path('tasks/<int:task_id>/run', views.run_task, name='pipeline-run-task'),
     path('site-tasks/<int:task_id>/publish', views.publish_task, name='pipeline-publish-task'),

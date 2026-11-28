@@ -1,10 +1,12 @@
 from io import BytesIO
+from unittest.mock import patch
 from zipfile import ZipFile
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
+from apps.content.models import CompanyKeyword
 from apps.modules.models import BizRecord
 
 from .models import KnowledgeChunk
@@ -70,6 +72,63 @@ class WorkflowTests(TestCase):
                 self.assertEqual(response.status_code, expected, response.content)
                 if expected == 400:
                     self.assertIn('文件超过 20 MB', response.json()['error']['message'])
+
+    @override_settings(AI_MODE='stub')
+    def test_suggest_and_save_business_keywords_from_imported_knowledge(self):
+        response = self.client.post('/api/pipeline/knowledge/', {
+            'name': '工业水泵知识库',
+            'company_name': '青山设备',
+            'text': '主营业务：工业水泵、变频控制柜。青山设备面向工厂客户。',
+        })
+        self.assertEqual(response.status_code, 201, response.content)
+        record_id = response.json()['data']['id']
+        CompanyKeyword.objects.create(owner=self.user, keyword='工业水泵')
+        url = f'/api/pipeline/knowledge/{record_id}/keywords'
+        result = self.client.post(url)
+        self.assertEqual(result.status_code, 200, result.content)
+        data = result.json()['data']
+        self.assertEqual(data['method'], 'local')
+        self.assertEqual([(item['keyword'], item['existing']) for item in data['items']],
+                         [('工业水泵', True), ('变频控制柜', False)])
+        self.assertIn('主营业务', data['items'][1]['evidence'])
+        self.assertEqual(CompanyKeyword.objects.filter(owner=self.user).count(), 1)
+
+        payload = {'keywords': ['变频控制柜', '工业水泵', ' 变频控制柜 ']}
+        saved = self.client.put(url, payload, content_type='application/json')
+        self.assertEqual(saved.json()['data'], {'created': 1, 'skipped': 2})
+        saved = self.client.put(url, payload, content_type='application/json')
+        self.assertEqual(saved.json()['data'], {'created': 0, 'skipped': 3})
+        keyword = CompanyKeyword.objects.get(owner=self.user, keyword='变频控制柜')
+        self.assertEqual(keyword.hit_word, '青山设备')
+        options = self.client.get('/api/keywords/options').json()['data']['items']
+        self.assertIn(keyword.pk, [item['id'] for item in options])
+
+    @override_settings(AI_MODE='proxy')
+    def test_model_only_suggests_terms_present_in_selected_library(self):
+        knowledge = BizRecord.objects.create(owner=self.user, module='user_huaxiang', title='提取',
+                                             data={'product': '工业水泵', 'company_name': '青山设备'})
+        url = f'/api/pipeline/knowledge/{knowledge.pk}/keywords'
+        with patch('apps.pipeline.keywords.complete_text',
+                   return_value='```json\n{"keywords":["工业水泵","太阳能电池","青山设备"]}\n```'):
+            data = self.client.post(url).json()['data']
+        self.assertEqual(data['method'], 'model')
+        self.assertEqual([item['keyword'] for item in data['items']], ['工业水泵'])
+        with patch('apps.pipeline.keywords.complete_text', side_effect=RuntimeError('unavailable')):
+            data = self.client.post(url).json()['data']
+        self.assertEqual(data['method'], 'local')
+        self.assertEqual([item['keyword'] for item in data['items']], ['工业水泵'])
+
+    @override_settings(AI_MODE='stub')
+    def test_keyword_extraction_requires_ownership_and_valid_selection(self):
+        knowledge = BizRecord.objects.create(owner=self.user, module='user_huaxiang', title='私有',
+                                             data={'summary': '公司成立于 2021 年。'})
+        url = f'/api/pipeline/knowledge/{knowledge.pk}/keywords'
+        self.assertEqual(self.client.post(url).json()['data']['items'], [])
+        self.assertEqual(self.client.put(url, {'keywords': []}, content_type='application/json').status_code, 400)
+        self.client.force_login(get_user_model().objects.create_user('external-keywords'))
+        self.assertEqual(self.client.post(url).status_code, 404)
+        self.assertEqual(self.client.put(url, {'keywords': ['工业水泵']},
+                                         content_type='application/json').status_code, 404)
 
     def _observation(self, **changes):
         return {

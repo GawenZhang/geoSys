@@ -1203,6 +1203,16 @@
     link.textContent='导出 Markdown';
     bar.appendChild(link);
   }
+  function ensureKeywordExtractionLink(){
+    var bar=one('#toolbar')||one('.bs-bars');
+    if(!bar)return;
+    var link=document.createElement('a');
+    link.className='btn btn-info';
+    link.href='/user/geo-knowledge';
+    link.dataset.geoNav='';
+    link.textContent='从知识库提取';
+    bar.appendChild(link);
+  }
   function clarifyWorkflowForms(){
     var form=one('#add-form');
     if(!form)return;
@@ -1311,6 +1321,7 @@
     if(apiResource()&&!/-add$|-edit|tougao|settle|configure/.test(pageKey))chain=chain.then(loadRemoteRows);
     if(pageKey==='dashboard')chain=chain.then(fillDashboard);
     if(pageKey==='article')chain=chain.then(function(){ensureArticleExport();});
+    if(pageKey==='company_keyword')chain=chain.then(ensureKeywordExtractionLink);
     if(pageKey==='visibility')chain=chain.then(loadVisibility);
     if(pageKey==='prompt_test'||pageKey==='knowledge_import')chain=chain.then(loadSelectOptions);
     if(pageKey==='general-profile'&&window.GeoAPI){

@@ -10,6 +10,7 @@ from apps.core.responses import fail, ok, paginate
 from apps.modules.models import BizRecord
 
 from .documents import MAX_CHARS, extract_upload
+from .keywords import save_business_keywords, suggest_business_keywords
 from .measurement import hostname, is_owned, matched_questions
 from .studio import append_knowledge_sources
 from .studio_views import _body, _user_or_401
@@ -139,6 +140,27 @@ def knowledge(request):
             })
         count = append_knowledge_sources(record, sources)
     return ok({'id': record.id, 'name': record.title, 'chunks': count}, status=200 if data['record_id'] else 201)
+
+
+@require_http_methods(['POST', 'PUT'])
+def knowledge_keywords(request, record_id):
+    user, error = _user_or_401(request)
+    if error:
+        return error
+    record = BizRecord.objects.filter(owner=user, module='user_huaxiang', id=record_id).first()
+    if not record:
+        return fail('not_found', '知识库不存在。', status=404)
+    if request.method == 'POST':
+        return ok(suggest_business_keywords(record))
+    body, error = _body(request)
+    if error:
+        return error
+    if not isinstance(body, dict):
+        return fail('validation_error', '请求应为 JSON 对象。')
+    try:
+        return ok(save_business_keywords(record, body.get('keywords')))
+    except ValueError as exc:
+        return fail('validation_error', str(exc))
 
 
 def _observation_payload(record):

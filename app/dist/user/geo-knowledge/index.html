@@ -5,14 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex,nofollow">
   <title>品牌知识库</title>
-  <link rel="stylesheet" href="/admin-runtime.css">
+  <link rel="stylesheet" href="/admin-runtime.css?v=knowledge-keywords">
 </head>
 <body class="geo-workflow" data-page-key="geo-knowledge">
   <main class="geo-workflow-main">
     <header class="geo-workflow-header">
       <a data-geo-nav href="/user/geo-workflow">返回 GEO 工作台</a>
       <h1>品牌知识库</h1>
-      <p>已有企业资料？给知识库起名，上传文件或粘贴正文。保存后，写作任务和试写都能选用这个库。</p>
+      <p>上传文件或粘贴企业资料。保存后，可以从知识库提取业务关键词，也可以在写作任务里选用。</p>
     </header>
     <div class="geo-workflow-columns">
       <section class="geo-panel">
@@ -44,13 +44,25 @@
         <ul class="geo-record-list" id="geo-knowledge-list"><li>正在加载…</li></ul>
         <div class="geo-links">
           <a data-geo-nav href="/user/user_huaxiang">管理已有知识库</a>
-          <a data-geo-nav href="/user/company_keyword">下一步：建立业务关键词</a>
+          <a data-geo-nav href="/user/company_keyword">查看已保存的业务关键词</a>
         </div>
       </aside>
     </div>
+    <section class="geo-panel geo-keyword-panel" id="geo-keyword-panel" aria-labelledby="geo-keyword-heading" hidden>
+      <h2 id="geo-keyword-heading" tabindex="-1">提取业务关键词</h2>
+      <form id="geo-keyword-form">
+        <p class="geo-help">核对产品或服务词组和资料原文。可以编辑，再勾选要保存的词。</p>
+        <p class="geo-form-status" role="status" data-status></p>
+        <div id="geo-keyword-candidates"></div>
+        <div class="geo-links" id="geo-keyword-actions" hidden>
+          <button class="geo-button" type="submit">保存选中的业务关键词</button>
+          <a data-geo-nav href="/user/company_question">下一步：整理客户问题</a>
+        </div>
+      </form>
+    </section>
   </main>
   <script src="/geo-api.js"></script><script src="/ai-config.js"></script>
-  <script src="/geo-workflow.js" defer></script>
+  <script src="/geo-workflow.js?v=knowledge-keywords" defer></script>
   <script src="/admin-runtime.js" defer></script>
 </body>
 </html>

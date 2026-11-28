@@ -107,6 +107,26 @@ body[data-page-key="shell"] .main-sidebar .slimScrollRail{
 .geo-workflow .geo-form-status[data-error] { color: #a42128; }
 .geo-record-list { margin: 0 0 12px; padding-left: 20px; overflow-wrap: anywhere; }
 .geo-record-list li + li { margin-top: 8px; }
+.geo-knowledge-actions { margin-top: 5px; gap: 6px; }
+.geo-keyword-panel { margin-top: 16px; }
+.geo-keyword-list-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: 8px 18px;
+  align-items: center;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--geo-line);
+}
+.geo-keyword-list-item .geo-help { margin: 0; overflow-wrap: anywhere; }
+.geo-keyword-input {
+  width: 100%;
+  padding: 8px 10px;
+  color: var(--geo-ink);
+  border: 1px solid #9fb5b7;
+  border-radius: 5px;
+  font: inherit;
+}
+#geo-keyword-actions { margin-top: 14px; }
 .geo-observation-results { margin-top: 16px; }
 .geo-table-wrap { overflow-x: auto; }
 .geo-workflow table { width: 100%; border-collapse: collapse; text-align: left; }
@@ -123,5 +143,5 @@ body[data-page-key="shell"] .main-sidebar .slimScrollRail{
 .geo-observation-record .geo-answer { white-space: pre-wrap; }
 #geo-observation-pages { margin-top: 10px; }
 @media (max-width: 650px) {
-  .geo-workflow-columns, .geo-form-grid { grid-template-columns: 1fr; }
+  .geo-workflow-columns, .geo-form-grid, .geo-keyword-list-item { grid-template-columns: 1fr; }
 }
